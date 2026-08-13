@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /login.html
+Allow: /register.html
+Allow: /privacy.html
+Allow: /terms.html
+
+Disallow: /api/
+Disallow: /admin.html
+
+Sitemap: https://wealthpulse.app/sitemap.xml

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Investments & Assets · Finora Financial Habit Builder</title>
+  <meta name="description" content="Track mutual funds, equities, gold, and fixed deposits to calculate net worth on Finora." />
+  <link rel="canonical" href="https://wealthpulse.app/investments.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Investments & Assets · Finora" />
+  <meta property="og:description" content="Asset allocation and portfolio tracking." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://wealthpulse.app/investments.html" />
+  <meta property="og:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Investments & Assets · Finora" />
+  <meta name="twitter:description" content="Net worth asset allocation and portfolio performance." />
+  <meta name="twitter:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <!-- jsPDF & autoTable for Report PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="sidebar"></aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <div class="flex gap-8" style="align-items: center; margin-bottom: 4px;">
+            <span class="badge purple">📈 Asset Portfolio</span>
+          </div>
+          <h1>Investments & Asset Portfolio</h1>
+          <p>Track your compounding capital across mutual funds, equities, gold, and fixed deposits.</p>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="grid cols-3" id="investment-stats">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Add Asset Form -->
+      <div class="card mt-24 mb-16">
+        <div class="flex between mb-16">
+          <h2>Add Asset / Holding</h2>
+          <span class="badge blue">Portfolio Asset</span>
+        </div>
+        <form id="inv-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="v-name">Asset Name</label>
+              <input id="v-name" required placeholder="e.g. UTI Nifty 50 Index Fund" data-testid="inv-name" />
+            </div>
+            <div class="form-group">
+              <label for="v-type">Asset Class</label>
+              <select id="v-type" data-testid="inv-type">
+                <option value="Mutual Funds">📊 Mutual Funds & SIPs</option>
+                <option value="Direct Stocks">📈 Equity & Stocks</option>
+                <option value="Index ETF">🏛️ Index ETFs</option>
+                <option value="Gold">🪙 Sovereign / Physical Gold</option>
+                <option value="Fixed Deposit">🔒 Fixed Deposit & Bonds</option>
+                <option value="PPF / EPF">💼 Provident Fund (EPF/PPF)</option>
+                <option value="Real Estate">🏡 Real Estate & REITs</option>
+                <option value="Crypto">⚡ Crypto Assets</option>
+                <option value="Other">📦 Other Holdings</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="v-invested">Amount Invested</label>
+              <input id="v-invested" type="number" min="0" step="0.01" required placeholder="0.00" data-testid="inv-invested" />
+            </div>
+            <div class="form-group">
+              <label for="v-current">Current Market Value</label>
+              <input id="v-current" type="number" min="0" step="0.01" required placeholder="0.00" data-testid="inv-current" />
+            </div>
+            <div class="form-group">
+              <label for="v-date">Date Acquired</label>
+              <input id="v-date" type="date" required data-testid="inv-date" />
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit" data-testid="inv-submit">+ Save Asset Record</button>
+        </form>
+      </div>
+
+      <!-- Portfolio Table -->
+      <div class="card">
+        <div class="flex between mb-16">
+          <h2>Holdings & Allocation</h2>
+          <span class="badge green">Live Valuations</span>
+        </div>
+        <div id="inv-list"><div class="spinner"></div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/pdfReport.js"></script>
+  <script src="/js/cookieConsent.js"></script>
+  <script>
+    Auth.requireLogin();
+    renderSidebar('investments');
+    document.getElementById('v-date').value = todayISO();
+
+    async function loadInv() {
+      const rows = await api('/api/investments');
+      const invested = rows.reduce((s, r) => s + Number(r.amount_invested), 0);
+      const current = rows.reduce((s, r) => s + Number(r.current_value), 0);
+      const gain = current - invested;
+      const pct = invested > 0 ? ((gain / invested) * 100).toFixed(2) : '0.00';
+
+      document.getElementById('investment-stats').innerHTML = `
+        <div class="card stat-card blue">
+          <div class="label">Total Capital Invested</div>
+          <div class="value">${fmtMoney(invested)}</div>
+          <div class="delta">Cost Basis</div>
+        </div>
+        <div class="card stat-card accent">
+          <div class="label">Current Market Value</div>
+          <div class="value">${fmtMoney(current)}</div>
+          <div class="delta">Liquid Portfolio Value</div>
+        </div>
+        <div class="card stat-card ${gain >= 0 ? 'green' : 'red'}">
+          <div class="label">Total Unrealized P&L</div>
+          <div class="value" style="color: ${gain >= 0 ? 'var(--success)' : 'var(--danger)'};">
+            ${gain >= 0 ? '+' : ''}${fmtMoney(gain)}
+            <span style="font-size:13px; font-weight:600; margin-left:6px;">(${gain >= 0 ? '+' : ''}${pct}%)</span>
+          </div>
+          <div class="delta">${gain >= 0 ? 'Profitable Growth' : 'Unrealized Drawdown'}</div>
+        </div>
+      `;
+
+      const el = document.getElementById('inv-list');
+      if (!rows.length) return el.innerHTML = `<div class="empty">No investment holdings logged yet. Record your assets above!</div>`;
+      el.innerHTML = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Asset Holding</th>
+              <th>Asset Class</th>
+              <th>Date Bought</th>
+              <th class="num">Invested</th>
+              <th class="num">Current Value (Editable)</th>
+              <th class="num">Unrealized Gain / Loss</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => {
+              const pnl = Number(r.current_value) - Number(r.amount_invested);
+              const pnlPct = Number(r.amount_invested) > 0 ? ((pnl / Number(r.amount_invested)) * 100).toFixed(1) : '0.0';
+              const isProfit = pnl >= 0;
+              return `
+                <tr>
+                  <td><strong>${r.asset_name}</strong></td>
+                  <td><span class="badge purple">${r.asset_type}</span></td>
+                  <td>${fmtDate(r.date)}</td>
+                  <td class="num">${fmtMoney(r.amount_invested)}</td>
+                  <td class="num">
+                    <input type="number" step="0.01" value="${r.current_value}" data-id="${r.id}" class="update-cur" style="width:130px; text-align:right;" data-testid="inv-current-${r.id}" title="Change value to update" />
+                  </td>
+                  <td class="num" style="color: ${isProfit ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">
+                    ${isProfit ? '+' : ''}${fmtMoney(pnl)} (${isProfit ? '+' : ''}${pnlPct}%)
+                  </td>
+                  <td class="text-right">
+                    <button class="btn btn-danger btn-sm" data-testid="delete-inv-${r.id}" onclick="deleteInv(${r.id})">Delete</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      document.querySelectorAll('.update-cur').forEach(inp => {
+        inp.addEventListener('change', async () => {
+          try {
+            await api(`/api/investments/${inp.dataset.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ current_value: Number(inp.value) }),
+            });
+            loadInv();
+          } catch (err) { alert(err.message); }
+        });
+      });
+    }
+
+    async function deleteInv(id) {
+      if (!confirm('Delete this asset from your portfolio?')) return;
+      await api(`/api/investments/${id}`, { method: 'DELETE' });
+      loadInv();
+    }
+
+    document.getElementById('inv-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/investments', {
+          method: 'POST',
+          body: JSON.stringify({
+            asset_name: document.getElementById('v-name').value.trim(),
+            asset_type: document.getElementById('v-type').value,
+            amount_invested: document.getElementById('v-invested').value,
+            current_value: document.getElementById('v-current').value,
+            date: document.getElementById('v-date').value,
+          }),
+        });
+        e.target.reset();
+        document.getElementById('v-date').value = todayISO();
+        loadInv();
+      } catch (err) { alert(err.message); }
+    });
+
+    loadInv();
+  </script>
+</body>
+</html>

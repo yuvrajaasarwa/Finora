@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Income & Expenses · Finora Financial Habit Builder</title>
+  <meta name="description" content="Log income and expenses, categorize transactions, and monitor monthly cash flow on Finora." />
+  <link rel="canonical" href="https://wealthpulse.app/expenses.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Income & Expenses · Finora" />
+  <meta property="og:description" content="Manage transactions, filter categories, and track money flow." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://wealthpulse.app/expenses.html" />
+  <meta property="og:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Income & Expenses · Finora" />
+  <meta name="twitter:description" content="Log income and expenses with real-time category distribution." />
+  <meta name="twitter:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <!-- jsPDF & autoTable for Report PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="sidebar"></aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <div class="flex gap-8" style="align-items: center; margin-bottom: 4px;">
+            <span class="badge blue">Cash Flow Ledger</span>
+          </div>
+          <h1>Income & Expense Tracker</h1>
+          <p>Log your inflows and outflows to build financial awareness and eliminate hidden money leaks.</p>
+        </div>
+      </div>
+
+      <!-- Add Income and Expense Forms -->
+      <div class="grid cols-2">
+        <!-- Add Income Card -->
+        <div class="card">
+          <div class="flex between mb-16">
+            <h2>Add Income Stream</h2>
+            <span class="badge green">+ Inflow</span>
+          </div>
+          <form id="income-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="i-source">Income Source</label>
+                <input id="i-source" required placeholder="e.g. Monthly Salary, Freelance" data-testid="income-source" />
+              </div>
+              <div class="form-group">
+                <label for="i-amount">Amount</label>
+                <input id="i-amount" type="number" min="0" step="0.01" required placeholder="0.00" data-testid="income-amount" />
+              </div>
+              <div class="form-group">
+                <label for="i-date">Date Received</label>
+                <input id="i-date" type="date" required data-testid="income-date" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="i-note">Notes / Reference (Optional)</label>
+              <input id="i-note" placeholder="e.g. Bonus, Client payment, Dividends" data-testid="income-note" />
+            </div>
+            <button class="btn btn-primary" type="submit" data-testid="income-submit">+ Save Income Record</button>
+          </form>
+        </div>
+
+        <!-- Add Expense Card -->
+        <div class="card">
+          <div class="flex between mb-16">
+            <h2>Record Expense</h2>
+            <span class="badge red">- Outflow</span>
+          </div>
+          <form id="expense-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="e-category">Category</label>
+                <select id="e-category" required data-testid="expense-category">
+                  <option value="Food & Dining">🍲 Food & Dining</option>
+                  <option value="Transport & Fuel">🚗 Transport & Fuel</option>
+                  <option value="Rent & Housing">🏠 Rent & Housing</option>
+                  <option value="Utilities & Bills">💡 Utilities & Bills</option>
+                  <option value="Entertainment & Leisure">🎬 Entertainment & Leisure</option>
+                  <option value="Shopping & Essentials">🛍️ Shopping & Essentials</option>
+                  <option value="Health & Medical">💊 Health & Medical</option>
+                  <option value="Education & Courses">📚 Education & Courses</option>
+                  <option value="Other">📦 Other / Miscellaneous</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="e-amount">Amount</label>
+                <input id="e-amount" type="number" min="0" step="0.01" required placeholder="0.00" data-testid="expense-amount" />
+              </div>
+              <div class="form-group">
+                <label for="e-date">Date Spent</label>
+                <input id="e-date" type="date" required data-testid="expense-date" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="e-note">Description / Item Note (Optional)</label>
+              <input id="e-note" placeholder="e.g. Weekly grocery haul, Uber to airport" data-testid="expense-note" />
+            </div>
+            <button class="btn btn-primary" type="submit" data-testid="expense-submit">- Save Expense Record</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- History Lists -->
+      <div class="grid cols-2 mt-24">
+        <!-- Income History -->
+        <div class="card">
+          <div class="flex between mb-16">
+            <h2>Income Records</h2>
+            <span id="income-total" class="badge green">Total: ₹0.00</span>
+          </div>
+          <div id="income-list"><div class="spinner"></div></div>
+        </div>
+
+        <!-- Expense History -->
+        <div class="card">
+          <div class="flex between mb-16">
+            <h2>Expense Records</h2>
+            <span id="expense-total" class="badge red">Total: ₹0.00</span>
+          </div>
+          <div id="expense-list"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/pdfReport.js"></script>
+  <script src="/js/cookieConsent.js"></script>
+  <script>
+    Auth.requireLogin();
+    renderSidebar('expenses');
+    document.getElementById('i-date').value = todayISO();
+    document.getElementById('e-date').value = todayISO();
+
+    async function loadIncome() {
+      const rows = await api('/api/income');
+      const total = rows.reduce((s, r) => s + Number(r.amount), 0);
+      document.getElementById('income-total').textContent = `Total: ${fmtMoney(total)}`;
+      const el = document.getElementById('income-list');
+      if (!rows.length) return el.innerHTML = `<div class="empty">No income logged yet. Record your first inflow above!</div>`;
+      el.innerHTML = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Source</th>
+              <th class="num">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td>${fmtDate(r.date)}</td>
+                <td>
+                  <strong>${r.source}</strong>
+                  ${r.note ? `<div class="text-muted" style="font-size:12px;">${r.note}</div>` : ''}
+                </td>
+                <td class="num" style="color: var(--success); font-weight: 600;">+${fmtMoney(r.amount)}</td>
+                <td class="text-right">
+                  <button class="btn btn-danger btn-sm" data-testid="delete-income-${r.id}" onclick="deleteIncome(${r.id})">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function loadExpenses() {
+      const rows = await api('/api/expenses');
+      const total = rows.reduce((s, r) => s + Number(r.amount), 0);
+      document.getElementById('expense-total').textContent = `Total: ${fmtMoney(total)}`;
+      const el = document.getElementById('expense-list');
+      if (!rows.length) return el.innerHTML = `<div class="empty">No expenses logged yet. Keep tracking your daily spend!</div>`;
+      el.innerHTML = `
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th class="num">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr>
+                <td>${fmtDate(r.date)}</td>
+                <td>
+                  <span class="badge">${r.category}</span>
+                  ${r.note ? `<div class="text-muted" style="font-size:12px; margin-top:2px;">${r.note}</div>` : ''}
+                </td>
+                <td class="num" style="color: var(--danger); font-weight: 600;">-${fmtMoney(r.amount)}</td>
+                <td class="text-right">
+                  <button class="btn btn-danger btn-sm" data-testid="delete-expense-${r.id}" onclick="deleteExpense(${r.id})">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function deleteIncome(id) {
+      if (!confirm('Are you sure you want to delete this income entry?')) return;
+      await api(`/api/income/${id}`, { method: 'DELETE' });
+      loadIncome();
+    }
+
+    async function deleteExpense(id) {
+      if (!confirm('Are you sure you want to delete this expense entry?')) return;
+      await api(`/api/expenses/${id}`, { method: 'DELETE' });
+      loadExpenses();
+    }
+
+    document.getElementById('income-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/income', {
+          method: 'POST',
+          body: JSON.stringify({
+            source: document.getElementById('i-source').value.trim(),
+            amount: document.getElementById('i-amount').value,
+            date: document.getElementById('i-date').value,
+            note: document.getElementById('i-note').value.trim(),
+          }),
+        });
+        e.target.reset();
+        document.getElementById('i-date').value = todayISO();
+        loadIncome();
+      } catch (err) { alert(err.message); }
+    });
+
+    document.getElementById('expense-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/expenses', {
+          method: 'POST',
+          body: JSON.stringify({
+            category: document.getElementById('e-category').value,
+            amount: document.getElementById('e-amount').value,
+            date: document.getElementById('e-date').value,
+            note: document.getElementById('e-note').value.trim(),
+          }),
+        });
+        e.target.reset();
+        document.getElementById('e-date').value = todayISO();
+        loadExpenses();
+      } catch (err) { alert(err.message); }
+    });
+
+    loadIncome();
+    loadExpenses();
+  </script>
+</body>
+</html>
