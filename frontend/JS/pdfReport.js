@@ -14,11 +14,11 @@ async function ensureUnicodeFont(doc) {
         const res = await fetch('/fonts/Roboto-Regular.ttf');
         if (res.ok) {
           const buf = await res.arrayBuffer();
-          let binary = '';
           const bytes = new Uint8Array(buf);
-          const len = bytes.byteLength;
-          for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
           }
           cachedRobotoBase64 = btoa(binary);
         }
