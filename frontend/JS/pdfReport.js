@@ -1,5 +1,98 @@
-// pdfReport.js - Professional 3-Page Financial Report Exporter for WealthPulse
-// Uses jsPDF & autoTable to build a vector A4 report
+// pdfReport.js - Professional 3-Page Financial Health Report Exporter for Finora
+// Uses jsPDF & autoTable to build a vector A4 fintech report with native Unicode (₹) support.
+
+let cachedRobotoBase64 = null;
+
+/**
+ * Loads and registers the Roboto Unicode font into jsPDF so Indian Rupee (₹)
+ * and all standard extended characters render natively without corruption.
+ */
+async function ensureUnicodeFont(doc) {
+  try {
+    if (!cachedRobotoBase64) {
+      if (typeof window !== 'undefined' && window.fetch) {
+        const res = await fetch('/fonts/Roboto-Regular.ttf');
+        if (res.ok) {
+          const buf = await res.arrayBuffer();
+          let binary = '';
+          const bytes = new Uint8Array(buf);
+          const len = bytes.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          cachedRobotoBase64 = btoa(binary);
+        }
+      }
+    }
+    if (cachedRobotoBase64) {
+      doc.addFileToVFS('Roboto-Regular.ttf', cachedRobotoBase64);
+      // Register all styles to prevent fallback to standard Helvetica on bold text
+      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold');
+      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'italic');
+      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bolditalic');
+      doc.setFont('Roboto', 'normal');
+      return true;
+    }
+  } catch (err) {
+    console.warn('Could not load custom Roboto font for jsPDF:', err);
+  }
+  return false;
+}
+
+/**
+ * Calculates a transparent, defensible Financial Health Score (0-100)
+ * based on savings rate (35%), expense control (25%), goal progress (20%), and habit discipline (20%).
+ */
+function calculateFinancialHealthScore(summary, goalsList, habitCount, habitsCompleted) {
+  const totalIncome = Number(summary.total_income || 0);
+  const totalExpense = Number(summary.total_expense || 0);
+  const netSavings = Number(summary.net_cash_savings || 0);
+  const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
+
+  // 1. Savings Rate Score (Max 35)
+  let savingsScore = 0;
+  if (savingsRate >= 30) savingsScore = 35;
+  else if (savingsRate >= 20) savingsScore = 28;
+  else if (savingsRate >= 10) savingsScore = 18;
+  else if (savingsRate > 0) savingsScore = 10;
+
+  // 2. Expense Control Ratio Score (Max 25)
+  const expenseRatio = totalIncome > 0 ? (totalExpense / totalIncome) : 1.0;
+  let expenseScore = 0;
+  if (expenseRatio <= 0.50) expenseScore = 25;
+  else if (expenseRatio <= 0.70) expenseScore = 20;
+  else if (expenseRatio <= 0.85) expenseScore = 12;
+  else if (expenseRatio <= 1.0) expenseScore = 5;
+
+  // 3. Goal Progression Score (Max 20)
+  let goalScore = 10; // neutral baseline if no goals
+  if (goalsList && goalsList.length > 0) {
+    let totalProg = 0;
+    goalsList.forEach(g => {
+      const target = Number(g.target_amount || 0);
+      const saved = Number(g.saved_amount || 0);
+      const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
+      totalProg += pct;
+    });
+    goalScore = Math.round(((totalProg / goalsList.length) / 100) * 20);
+  }
+
+  // 4. Habit Accountability Score (Max 20)
+  let habitScore = 10; // neutral baseline if no habits
+  if (habitCount > 0) {
+    habitScore = Math.round(Math.min(1, habitsCompleted / habitCount) * 20);
+  }
+
+  const score = Math.min(100, Math.max(0, savingsScore + expenseScore + goalScore + habitScore));
+  let label = 'MODERATE';
+  if (score >= 80) label = 'EXCELLENT';
+  else if (score >= 65) label = 'GOOD';
+  else if (score >= 50) label = 'MODERATE';
+  else label = 'NEEDS FOCUS';
+
+  return { score, label };
+}
 
 async function generateFinancialReportPDF() {
   const triggerBtn = document.getElementById('download-pdf-btn');
@@ -10,7 +103,7 @@ async function generateFinancialReportPDF() {
   }
 
   try {
-    // 1. Fetch real-time data from API
+    // 1. Fetch real-time user data from API
     const [summary, incomeList, expenseList, habitsList, goalsList, investmentsList] = await Promise.all([
       api('/api/analytics/summary'),
       api('/api/income'),
@@ -23,7 +116,7 @@ async function generateFinancialReportPDF() {
     const user = Auth.user || { name: 'Valued Member', email: 'user@finora.app', currency: 'INR' };
     const currency = user.currency || 'INR';
 
-    // Verify jsPDF availability
+    // Verify jsPDF library availability
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error('PDF generator library (jsPDF) is not loaded. Please refresh the page.');
     }
@@ -35,6 +128,10 @@ async function generateFinancialReportPDF() {
       format: 'a4',
     });
 
+    // Ensure Unicode font (Roboto) is registered
+    const fontLoaded = await ensureUnicodeFont(doc);
+    const activeFont = fontLoaded ? 'Roboto' : 'helvetica';
+
     const pageWidth = doc.internal.pageSize.getWidth(); // ~210mm
     const pageHeight = doc.internal.pageSize.getHeight(); // ~297mm
     const margin = 14;
@@ -44,10 +141,10 @@ async function generateFinancialReportPDF() {
     const colors = {
       navy: [15, 23, 42],
       slate: [30, 41, 59],
-      primary: [23, 107, 77], // Finora deep forest green accent
+      primary: [23, 107, 77], // Finora deep green
       green: [16, 185, 129],
-      red: [244, 63, 94],
-      amber: [245, 158, 11],
+      red: [225, 29, 72],
+      amber: [217, 119, 6],
       lightBg: [248, 250, 252],
       cardBorder: [226, 232, 240],
       textDark: [15, 23, 42],
@@ -61,66 +158,47 @@ async function generateFinancialReportPDF() {
       day: 'numeric',
     });
 
-    // Helper: Draw Header & Footer for pages
-    function drawPageTemplate(pageNum, totalPages, title) {
+    // Helper: Draw Header & Footer template for each page
+    function drawPageTemplate(pageNum, totalPages, subtitle) {
       // Header Bar
       doc.setFillColor(...colors.navy);
       doc.rect(0, 0, pageWidth, 22, 'F');
 
-      // Brand Logo & Title
+      // Logo Icon & Brand Name
       doc.setFillColor(...colors.primary);
       doc.roundedRect(margin, 4, 14, 14, 2, 2, 'F');
       doc.setTextColor(...colors.white);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(activeFont, 'bold');
       doc.setFontSize(11);
       doc.text('F', margin + 5, 13.5);
 
       doc.setFontSize(13);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(activeFont, 'bold');
       doc.text('Finora', margin + 18, 11);
       doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(activeFont, 'normal');
       doc.setTextColor(203, 213, 225);
-      doc.text('Financial Habit Builder & Wealth Growth Tracker', margin + 18, 16);
+      doc.text('Financial Health & Wealth Tracker', margin + 18, 16);
 
-      // Report Header Right
+      // Header Right
       doc.setFontSize(8);
       doc.setTextColor(226, 232, 240);
-      doc.text(`CONFIDENTIAL REPORT · ${title.toUpperCase()}`, pageWidth - margin, 11, { align: 'right' });
+      doc.text(`CONFIDENTIAL REPORT · ${subtitle.toUpperCase()}`, pageWidth - margin, 11, { align: 'right' });
       doc.text(`Date: ${reportDate}`, pageWidth - margin, 16, { align: 'right' });
 
-      // Footer
+      // Footer Separator & Info
       doc.setDrawColor(...colors.cardBorder);
       doc.setLineWidth(0.3);
       doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
       doc.setFontSize(8);
+      doc.setFont(activeFont, 'normal');
       doc.setTextColor(...colors.textMuted);
       doc.text(`Prepared for: ${user.name} (${user.email})`, margin, pageHeight - 7);
       doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
     }
 
-    // =========================================================================
-    // PAGE 1 — FINANCIAL OVERVIEW
-    // =========================================================================
-    drawPageTemplate(1, 3, 'Page 1 — Financial Overview');
-
-    let y = 30;
-
-    // Report Title Block
-    doc.setTextColor(...colors.textDark);
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Executive Financial Overview', margin, y);
-    y += 6;
-
-    doc.setFontSize(9.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...colors.textMuted);
-    doc.text(`Comprehensive financial snapshot and liquidity analysis for ${user.name}.`, margin, y);
-    y += 10;
-
-    // Calculate Key Metrics
+    // Key financial metric calculations
     const totalIncome = summary.total_income || 0;
     const totalExpense = summary.total_expense || 0;
     const netSavings = summary.net_cash_savings || 0;
@@ -128,155 +206,211 @@ async function generateFinancialReportPDF() {
     const savingsRate = totalIncome > 0 ? Math.max(0, Math.round((netSavings / totalIncome) * 100)) : 0;
     const investmentsVal = summary.investments_current_value || 0;
     const goalsSaved = summary.total_saved_in_goals || 0;
+    const habitCount = summary.habit_count || (habitsList ? habitsList.length : 0);
+    const habitsCompleted = summary.habits_completed_today || 0;
 
-    // 4 Key Summary Cards Grid
-    const cardWidth = (contentWidth - 9) / 2;
-    const cardHeight = 24;
+    // =========================================================================
+    // PAGE 1 — FINANCIAL OVERVIEW
+    // =========================================================================
+    drawPageTemplate(1, 3, 'Executive Financial Overview');
+    let y = 30;
+
+    // Page Title Block
+    doc.setFontSize(16);
+    doc.setFont(activeFont, 'bold');
+    doc.setTextColor(...colors.textDark);
+    doc.text('Executive Financial Overview', margin, y);
+    y += 5;
+
+    doc.setFontSize(9);
+    doc.setFont(activeFont, 'normal');
+    doc.setTextColor(...colors.textMuted);
+    doc.text(`Comprehensive financial snapshot and liquidity analysis for ${user.name}.`, margin, y);
+    y += 9;
+
+    // Financial Health Score Banner Card
+    const health = calculateFinancialHealthScore(summary, goalsList, habitCount, habitsCompleted);
+    doc.setFillColor(240, 253, 244); // soft green tint
+    doc.setDrawColor(187, 247, 208);
+    doc.roundedRect(margin, y, contentWidth, 18, 2, 2, 'FD');
+
+    doc.setFillColor(...colors.primary);
+    doc.roundedRect(margin, y, 3, 18, 1.5, 1.5, 'F');
+
+    doc.setFontSize(8);
+    doc.setFont(activeFont, 'bold');
+    doc.setTextColor(...colors.primary);
+    doc.text('FINORA FINANCIAL HEALTH SCORE', margin + 7, y + 6);
+
+    doc.setFontSize(13);
+    doc.setFont(activeFont, 'bold');
+    doc.setTextColor(...colors.textDark);
+    doc.text(`${health.score} / 100 · ${health.label}`, margin + 7, y + 13.5);
+
+    doc.setFontSize(7.5);
+    doc.setFont(activeFont, 'normal');
+    doc.setTextColor(...colors.textMuted);
+    doc.text('Calculated from savings rate, expense ratio, goal progress & habit streaks.', margin + 75, y + 13.5);
+
+    y += 24;
+
+    // 4 Key Summary Metric Cards Grid (2x2)
+    const cardWidth = (contentWidth - 8) / 2;
+    const cardHeight = 22;
 
     const cardsData = [
-      { label: 'TOTAL NET WORTH', val: fmtMoney(netWorth, currency), sub: 'Savings + Investment Assets', color: colors.primary },
-      { label: 'MONTHLY CASH FLOW', val: `${fmtMoney(totalIncome, currency)} / ${fmtMoney(totalExpense, currency)}`, sub: 'Income Inflows vs Expense Outflows', color: colors.green },
-      { label: 'SAVINGS RATE', val: `${savingsRate}%`, sub: savingsRate >= 20 ? 'Optimal discipline (Target >20%)' : 'Needs attention (Target >20%)', color: savingsRate >= 20 ? colors.green : colors.amber },
-      { label: 'INVESTMENTS & GOALS', val: fmtMoney(investmentsVal + goalsSaved, currency), sub: `Assets: ${fmtMoney(investmentsVal, currency)} | Goals: ${fmtMoney(goalsSaved, currency)}`, color: colors.slate },
+      { label: 'NET WORTH', val: fmtMoney(netWorth, currency), sub: 'Cash Savings + Investment Assets', color: colors.primary },
+      { label: 'MONTHLY INCOME', val: fmtMoney(totalIncome, currency), sub: 'Total Cash Inflows Logged', color: colors.green },
+      { label: 'MONTHLY EXPENSES', val: fmtMoney(totalExpense, currency), sub: 'Total Cash Outflows Logged', color: colors.red },
+      { label: 'SAVINGS RATE', val: `${savingsRate}%`, sub: `Monthly Savings: ${fmtMoney(netSavings, currency)}`, color: savingsRate >= 20 ? colors.green : colors.amber },
     ];
 
     cardsData.forEach((c, idx) => {
       const col = idx % 2;
       const row = Math.floor(idx / 2);
-      const cx = margin + col * (cardWidth + 9);
-      const cy = y + row * (cardHeight + 6);
+      const cx = margin + col * (cardWidth + 8);
+      const cy = y + row * (cardHeight + 5);
 
-      // Card Background & Border
       doc.setFillColor(...colors.lightBg);
       doc.setDrawColor(...colors.cardBorder);
       doc.roundedRect(cx, cy, cardWidth, cardHeight, 2, 2, 'FD');
 
-      // Accent Left Bar
       doc.setFillColor(...c.color);
       doc.roundedRect(cx, cy, 3, cardHeight, 1.5, 1.5, 'F');
 
-      // Text inside card
       doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(activeFont, 'bold');
       doc.setTextColor(...colors.textMuted);
       doc.text(c.label, cx + 7, cy + 6);
 
-      doc.setFontSize(13);
-      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12.5);
+      doc.setFont(activeFont, 'bold');
       doc.setTextColor(...colors.textDark);
-      doc.text(c.val, cx + 7, cy + 14);
+      doc.text(c.val, cx + 7, cy + 13.5);
 
       doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(activeFont, 'normal');
       doc.setTextColor(...colors.textMuted);
-      doc.text(c.sub, cx + 7, cy + 20);
+      doc.text(c.sub, cx + 7, cy + 18.5);
     });
 
-    y += (cardHeight * 2) + 16;
+    y += (cardHeight * 2) + 12;
 
-    // Financial Highlights & Position Table
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
+    // Key Financial Position Highlights Table
+    doc.setFontSize(11);
+    doc.setFont(activeFont, 'bold');
     doc.setTextColor(...colors.textDark);
     doc.text('Key Financial Position Highlights', margin, y);
-    y += 6;
+    y += 5;
 
     const highlightsRows = [
-      ['Metric / Account Layer', 'Current Balance / Status', 'Benchmark / Health Indicator'],
-      ['Liquid Cash Inflow (Income)', fmtMoney(totalIncome, currency), 'Active Inflow Stream'],
-      ['Total Cash Outflow (Expenses)', fmtMoney(totalExpense, currency), totalExpense <= totalIncome * 0.7 ? 'Controlled (<70% Inflow)' : 'High Spend (>70% Inflow)'],
-      ['Retained Net Cash Savings', fmtMoney(netSavings, currency), netSavings > 0 ? 'Positive Surplus' : 'Deficit Alert'],
-      ['Active Investment Holdings', fmtMoney(investmentsVal, currency), `${investmentsList.length} Holdings Tracked`],
-      ['Sinking Goals Capital', fmtMoney(goalsSaved, currency), `${goalsList.length} Active Goals`],
-      ['Daily Habit Discipline Index', `${summary.habits_completed_today}/${summary.habit_count} Completed Today`, `${summary.habit_count} Configured Habits`],
+      ['Monthly Income', fmtMoney(totalIncome, currency), 'Active Inflow Stream'],
+      ['Monthly Expenses', fmtMoney(totalExpense, currency), totalExpense <= totalIncome * 0.7 ? 'Controlled (<70% Inflow)' : 'High Spend (>70% Inflow)'],
+      ['Monthly Savings', fmtMoney(netSavings, currency), netSavings > 0 ? 'Positive Surplus' : 'Deficit Alert'],
+      ['Investment Assets', fmtMoney(investmentsVal, currency), `${investmentsList ? investmentsList.length : 0} Holdings Tracked`],
+      ['Savings Goals Earmarked', fmtMoney(goalsSaved, currency), `${goalsList ? goalsList.length : 0} Active Goals`],
+      ['Daily Habit Completion', `${habitsCompleted}/${habitCount} Completed Today`, `${habitCount} Configured Habits`],
     ];
 
     if (doc.autoTable) {
       doc.autoTable({
         startY: y,
-        head: [highlightsRows[0]],
-        body: highlightsRows.slice(1),
+        head: [['Metric / Position Layer', 'Current Balance / Status', 'Benchmark / Indicator']],
+        body: highlightsRows,
         theme: 'striped',
-        headStyles: { fillStyle: 'F', fillColor: colors.navy, textColor: colors.white, fontStyle: 'bold', fontSize: 8.5 },
-        bodyStyles: { fontSize: 8.5, textColor: colors.textDark },
+        styles: { font: activeFont, fontSize: 8.5 },
+        headStyles: { font: activeFont, fontStyle: 'bold', fillColor: colors.navy, textColor: colors.white, fontSize: 8.5 },
+        bodyStyles: { font: activeFont, textColor: colors.textDark },
         alternateRowStyles: { fillColor: colors.lightBg },
         margin: { left: margin, right: margin },
       });
-      y = doc.lastAutoTable.finalY + 12;
+      y = doc.lastAutoTable.finalY + 10;
     }
 
-    // Summary Narrative Box
+    // Executive Summary Narrative Box
     doc.setFillColor(239, 246, 255); // soft blue tint
     doc.setDrawColor(191, 219, 254);
-    doc.roundedRect(margin, y, contentWidth, 24, 2, 2, 'FD');
+    doc.roundedRect(margin, y, contentWidth, 26, 2, 2, 'FD');
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...colors.primary);
-    doc.text('📌 Executive Summary Insight', margin + 5, y + 6);
+    doc.setFillColor(...colors.primary);
+    doc.roundedRect(margin, y, 3, 26, 1.5, 1.5, 'F');
 
     doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(activeFont, 'bold');
+    doc.setTextColor(...colors.primary);
+    doc.text('EXECUTIVE SUMMARY INSIGHT', margin + 7, y + 7);
+
+    doc.setFontSize(8.5);
+    doc.setFont(activeFont, 'normal');
     doc.setTextColor(...colors.textDark);
     const summaryMsg = savingsRate >= 20
-      ? `Strong financial performance. Your current savings rate of ${savingsRate}% exceeds the standard 20% benchmark. You have accumulated ${fmtMoney(netWorth, currency)} in overall net worth across liquid cash and investments.`
-      : `Opportunity for optimization. Your current savings rate is ${savingsRate}%. Focus on trimming non-essential recurring expenses and maintaining daily habit streaks to boost monthly cash retention toward the 20%+ target.`;
-    
-    doc.text(doc.splitTextToSize(summaryMsg, contentWidth - 10), margin + 5, y + 12);
+      ? `Strong financial performance. Your current monthly savings rate of ${savingsRate}% exceeds the standard 20% benchmark. You have accumulated ${fmtMoney(netWorth, currency)} in total net worth across cash savings and investment assets.`
+      : `Opportunity for optimization. Your current monthly savings rate is ${savingsRate}%. Focus on trimming discretionary expenses and maintaining daily habit streaks to increase your monthly savings velocity toward the 20%+ target.`;
+
+    const splitSummary = doc.splitTextToSize(summaryMsg, contentWidth - 14);
+    doc.text(splitSummary, margin + 7, y + 14);
 
     // =========================================================================
     // PAGE 2 — DETAILED BREAKDOWN & CASH FLOW
     // =========================================================================
     doc.addPage();
-    drawPageTemplate(2, 3, 'Page 2 — Detailed Breakdown');
+    drawPageTemplate(2, 3, 'Detailed Breakdown & Cash Flow');
     y = 30;
 
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(activeFont, 'bold');
     doc.setTextColor(...colors.textDark);
-    doc.text('Expense Category Breakdown & Top Transactions', margin, y);
+    doc.text('Expense Breakdown & Recent Activity', margin, y);
+    y += 5;
+
+    doc.setFontSize(8.5);
+    doc.setFont(activeFont, 'normal');
+    doc.setTextColor(...colors.textMuted);
+    doc.text('Detailed analysis of category spend, recent transactions, savings milestones, and cash dynamics.', margin, y);
     y += 8;
 
-    // Expense Category Table
+    // 1. Expense Category Breakdown Table
     const catData = (summary.category_breakdown && summary.category_breakdown.length)
       ? summary.category_breakdown.map(c => [
           c.category,
           fmtMoney(c.total, currency),
           `${totalExpense > 0 ? Math.round((c.total / totalExpense) * 100) : 0}%`,
         ])
-      : [['General', fmtMoney(totalExpense, currency), '100%']];
+      : [['General / Miscellaneous', fmtMoney(totalExpense, currency), '100%']];
 
     if (doc.autoTable) {
       doc.autoTable({
         startY: y,
-        head: [['Category', 'Total Amount Spent', 'Share of Total Expenses']],
+        head: [['Expense Category', 'Total Amount Spent', 'Share of Outflow']],
         body: catData,
         theme: 'grid',
-        headStyles: { fillColor: colors.slate, textColor: colors.white, fontSize: 8.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 8, textColor: colors.textDark },
+        styles: { font: activeFont, fontSize: 8 },
+        headStyles: { font: activeFont, fontStyle: 'bold', fillColor: colors.slate, textColor: colors.white, fontSize: 8 },
+        bodyStyles: { font: activeFont, textColor: colors.textDark },
         margin: { left: margin, right: margin },
       });
-      y = doc.lastAutoTable.finalY + 10;
+      y = doc.lastAutoTable.finalY + 8;
     }
 
-    // Top 10 Recent Transactions Table
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
+    // 2. Recent Financial Transactions Table (Top 10)
+    doc.setFontSize(11);
+    doc.setFont(activeFont, 'bold');
     doc.setTextColor(...colors.textDark);
     doc.text('Recent Financial Transactions (Top 10)', margin, y);
-    y += 6;
+    y += 5;
 
     const allTx = [
-      ...incomeList.map(i => ({ date: i.date, desc: i.source, amount: i.amount, type: 'INCOME' })),
-      ...expenseList.map(e => ({ date: e.date, desc: `${e.category} (${e.note || 'Expense'})`, amount: -e.amount, type: 'EXPENSE' })),
+      ...(incomeList || []).map(i => ({ date: i.date, desc: i.source || 'Income', amount: i.amount, type: 'INCOME' })),
+      ...(expenseList || []).map(e => ({ date: e.date, desc: `${e.category}${e.note ? ' - ' + e.note : ''}`, amount: -e.amount, type: 'EXPENSE' })),
     ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
 
-    const txRows = allTx.length ? allTx.map(t => [
-      t.date,
-      t.desc,
-      t.type,
-      fmtMoney(Math.abs(t.amount), currency),
-    ]) : [['-', 'No transactions logged yet', '-', '-']];
+    const txRows = allTx.length ? allTx.map(t => {
+      const isInc = t.type === 'INCOME';
+      const prefix = isInc ? '+' : '-';
+      const formattedVal = `${prefix}${fmtMoney(Math.abs(t.amount), currency)}`;
+      const safeDesc = t.desc.length > 40 ? t.desc.slice(0, 37) + '...' : t.desc;
+      return [t.date || todayISO(), safeDesc, t.type, formattedVal];
+    }) : [['-', 'No recent transactions logged', '-', '-']];
 
     if (doc.autoTable) {
       doc.autoTable({
@@ -284,76 +418,124 @@ async function generateFinancialReportPDF() {
         head: [['Date', 'Description / Category', 'Type', 'Amount']],
         body: txRows,
         theme: 'striped',
-        headStyles: { fillColor: colors.navy, textColor: colors.white, fontSize: 8.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 8, textColor: colors.textDark },
-        columnStyles: { 3: { fontStyle: 'bold', halign: 'right' } },
-        margin: { left: margin, right: margin },
-      });
-      y = doc.lastAutoTable.finalY + 10;
-    }
-
-    // Goals & Habits Snapshot
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...colors.textDark);
-    doc.text('Savings Goals & Daily Habit Streaks', margin, y);
-    y += 6;
-
-    const goalsRows = goalsList.length
-      ? goalsList.slice(0, 4).map(g => [g.title, fmtMoney(g.target_amount, currency), fmtMoney(g.saved_amount, currency), `${g.progress_percent || Math.round((g.saved_amount/g.target_amount)*100)}%`])
-      : [['No active goals set', '-', '-', '-']];
-
-    if (doc.autoTable) {
-      doc.autoTable({
-        startY: y,
-        head: [['Goal Milestone', 'Target Amount', 'Saved So Far', 'Progress']],
-        body: goalsRows,
-        theme: 'grid',
-        headStyles: { fillColor: colors.primary, textColor: colors.white, fontSize: 8.5, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 8, textColor: colors.textDark },
+        styles: { font: activeFont, fontSize: 8 },
+        headStyles: { font: activeFont, fontStyle: 'bold', fillColor: colors.navy, textColor: colors.white, fontSize: 8 },
+        bodyStyles: { font: activeFont, textColor: colors.textDark },
+        columnStyles: {
+          2: { fontStyle: 'bold' },
+          3: { fontStyle: 'bold', halign: 'right' },
+        },
+        didParseCell: function(data) {
+          if (data.section === 'body' && data.column.index === 3) {
+            const valStr = String(data.cell.raw || '');
+            if (valStr.startsWith('+')) {
+              data.cell.styles.textColor = colors.green;
+            } else if (valStr.startsWith('-')) {
+              data.cell.styles.textColor = colors.red;
+            }
+          }
+        },
         margin: { left: margin, right: margin },
       });
       y = doc.lastAutoTable.finalY + 8;
     }
 
-    // Embed Active Chart Canvas Image if available
+    // 3. Savings Goals Visual Progress Section
+    doc.setFontSize(11);
+    doc.setFont(activeFont, 'bold');
+    doc.setTextColor(...colors.textDark);
+    doc.text('Savings Goals Progress', margin, y);
+    y += 5;
+
+    if (goalsList && goalsList.length > 0) {
+      const goalSlice = goalsList.slice(0, 4);
+      goalSlice.forEach(g => {
+        const target = Number(g.target_amount || 0);
+        const saved = Number(g.saved_amount || 0);
+        const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+
+        doc.setFillColor(...colors.lightBg);
+        doc.setDrawColor(...colors.cardBorder);
+        doc.roundedRect(margin, y, contentWidth, 15, 1.5, 1.5, 'FD');
+
+        doc.setFontSize(8.5);
+        doc.setFont(activeFont, 'bold');
+        doc.setTextColor(...colors.textDark);
+        doc.text(g.title, margin + 4, y + 5);
+
+        doc.setFontSize(8);
+        doc.setFont(activeFont, 'bold');
+        doc.setTextColor(...colors.primary);
+        doc.text(`${pct}% (${fmtMoney(saved, currency)} / ${fmtMoney(target, currency)})`, pageWidth - margin - 4, y + 5, { align: 'right' });
+
+        const barX = margin + 4;
+        const barY = y + 8;
+        const barWidth = contentWidth - 8;
+        const barHeight = 3.5;
+
+        doc.setFillColor(226, 232, 240); // Track gray
+        doc.roundedRect(barX, barY, barWidth, barHeight, 1, 1, 'F');
+
+        if (pct > 0) {
+          const fillW = Math.max(2, (barWidth * pct) / 100);
+          doc.setFillColor(...colors.primary);
+          doc.roundedRect(barX, barY, fillW, barHeight, 1, 1, 'F');
+        }
+
+        y += 18;
+      });
+    } else {
+      doc.setFillColor(...colors.lightBg);
+      doc.setDrawColor(...colors.cardBorder);
+      doc.roundedRect(margin, y, contentWidth, 14, 1.5, 1.5, 'FD');
+      doc.setFontSize(8);
+      doc.setFont(activeFont, 'normal');
+      doc.setTextColor(...colors.textMuted);
+      doc.text('No active savings goals set. Create goals in Finora to track targeted savings milestones.', margin + 5, y + 8.5);
+      y += 18;
+    }
+
+    // 4. Monthly Cash Flow Dynamics Chart Snapshot
     const activeChartCanvas = document.getElementById('cashflow-chart') || document.getElementById('cf-chart');
     if (activeChartCanvas) {
       try {
         const chartImgData = activeChartCanvas.toDataURL('image/png', 1.0);
         doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(activeFont, 'bold');
+        doc.setTextColor(...colors.textDark);
         doc.text('Monthly Cash Flow Dynamics (Chart Snapshot)', margin, y);
         y += 4;
-        doc.addImage(chartImgData, 'PNG', margin, y, contentWidth, 38);
+        const chartHeight = Math.min(34, pageHeight - margin - 15 - y);
+        if (chartHeight > 15) {
+          doc.addImage(chartImgData, 'PNG', margin, y, contentWidth, chartHeight);
+        }
       } catch (e) {
         console.warn('Could not export chart image to PDF:', e);
       }
     }
 
     // =========================================================================
-    // PAGE 3 — AI INSIGHTS & RECOMMENDATIONS
+    // PAGE 3 — AUTOMATED INSIGHTS & RECOMMENDATIONS
     // =========================================================================
     doc.addPage();
-    drawPageTemplate(3, 3, 'Page 3 — Insights & Recommendations');
+    drawPageTemplate(3, 3, 'Insights & Recommendations');
     y = 30;
 
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(activeFont, 'bold');
     doc.setTextColor(...colors.textDark);
-    doc.text('Automated Insights & Financial Recommendations', margin, y);
-    y += 6;
+    doc.text('Automated Insights & Recommendations', margin, y);
+    y += 5;
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setFont(activeFont, 'normal');
     doc.setTextColor(...colors.textMuted);
-    doc.text('Algorithmic analysis derived from your real-time cash flow and habit consistency.', margin, y);
-    y += 12;
+    doc.text('Algorithmic analysis derived from your real-time cash flow, habit consistency, and goal trajectory.', margin, y);
+    y += 8;
 
-    // Rule-Based Insights Evaluation
     const insights = [];
 
-    // 1. Spending Warning
+    // 1. Spending Concentration Warning
     let highestCat = null;
     let highestCatTotal = 0;
     if (summary.category_breakdown && summary.category_breakdown.length) {
@@ -365,107 +547,116 @@ async function generateFinancialReportPDF() {
       const pct = Math.round((highestCatTotal / totalExpense) * 100);
       if (pct > 30) {
         insights.push({
-          title: `⚠️ Spending Concentration Warning: ${highestCat}`,
-          desc: `Your spending in "${highestCat}" represents ${pct}% of your total monthly outflow (${fmtMoney(highestCatTotal, currency)}). Consider establishing a weekly spending cap to avoid overruns.`,
           tag: 'SPENDING WARNING',
+          title: `Spending Concentration: ${highestCat}`,
+          desc: `Your spending in "${highestCat}" represents ${pct}% of your total monthly expense outflow (${fmtMoney(highestCatTotal, currency)}). Consider establishing a monthly category cap to avoid cash flow strain.`,
           color: colors.red,
         });
       }
     }
 
-    // 2. Savings Rate Recommendation
+    // 2. Savings Discipline
     if (savingsRate >= 30) {
       insights.push({
-        title: `⚡ Exceptional Savings Discipline (${savingsRate}%)`,
-        desc: `You are saving ${savingsRate}% of your total earnings. Allocate surplus cash flow toward higher-yield investment assets (e.g. index funds or target SIPs) to accelerate net worth compounding.`,
         tag: 'WEALTH GROWTH',
+        title: `Exceptional Savings Discipline (${savingsRate}%)`,
+        desc: `You are retaining ${savingsRate}% of your total monthly earnings. Consider channeling surplus liquid cash flow into compounding investment assets to accelerate long-term net worth growth.`,
         color: colors.green,
       });
     } else if (savingsRate >= 15) {
       insights.push({
-        title: `📈 Good Cash Retention (${savingsRate}%)`,
-        desc: `You are retaining ${savingsRate}% of income. To reach financial independence milestones faster, aim to reduce recurring discretionary expenses by 5-10% next month.`,
         tag: 'OPTIMIZATION',
+        title: `Good Cash Retention (${savingsRate}%)`,
+        desc: `You are retaining ${savingsRate}% of monthly earnings. To reach financial independence milestones faster, aim to optimize variable recurring expenses by 5-10% next month.`,
         color: colors.primary,
       });
     } else {
       insights.push({
-        title: `🚨 Low Savings Margin (${savingsRate}%)`,
-        desc: `Your savings rate is below the 20% healthy threshold. Review variable expenses immediately and automate a fixed daily micro-saving habit.`,
         tag: 'ACTION REQUIRED',
+        title: `Low Savings Margin (${savingsRate}%)`,
+        desc: `Your current monthly savings rate is below the recommended 20% benchmark. Review non-essential spending categories and automate daily savings habits to build a stronger buffer.`,
         color: colors.red,
       });
     }
 
-    // 3. Habit Improvement Suggestion
-    const habitCount = summary.habit_count || 0;
-    const habitsCompleted = summary.habits_completed_today || 0;
+    // 3. Habit Streak Consistency
     if (habitCount === 0) {
       insights.push({
-        title: `⚡ Habit System Inactive`,
-        desc: `You haven't configured any financial habits. Creating simple daily habits (e.g., "Log all cash purchases", "Save ₹100 daily") is statistically proven to boost savings by 3.4x.`,
-        tag: 'HABIT TIP',
+        tag: 'HABIT SYSTEM',
+        title: 'Habit Accountability Inactive',
+        desc: 'You haven\'t configured any daily financial habits. Setting up simple daily tracking habits (e.g., "Log cash expenses", "Review daily spend") reinforces long-term financial discipline.',
         color: colors.amber,
       });
     } else {
       insights.push({
-        title: `⚡ Habit Streak Progress (${habitsCompleted}/${habitCount} Done Today)`,
-        desc: `Habit consistency drives automatic wealth building. Maintain your daily streaks without breaking the chain to form permanent money discipline.`,
         tag: 'HABIT STREAK',
+        title: `Habit Streak Progress (${habitsCompleted}/${habitCount} Done Today)`,
+        desc: `Daily financial habits drive sustained wealth creation. Maintain your streak consistency without breaking the chain to automate financial control.`,
         color: colors.green,
       });
     }
 
-    // 4. Wealth Growth Projection Summary
+    // 4. Simple 12-Month Net Worth Projection
     const projectedNetWorthIn1Year = Math.round(netWorth + (netSavings * 12));
     insights.push({
-      title: `📊 12-Month Net Worth Projection`,
-      desc: `At your current average monthly savings velocity of ${fmtMoney(netSavings, currency)}, your net worth is projected to reach approximately ${fmtMoney(projectedNetWorthIn1Year, currency)} over the next 12 months.`,
       tag: 'PROJECTION',
+      title: 'Simple 12-Month Net Worth Projection',
+      desc: `At your current monthly savings velocity of ${fmtMoney(netSavings, currency)}, your net worth is projected to reach approximately ${fmtMoney(projectedNetWorthIn1Year, currency)} in 12 months. NOTE: This is a simple projection assuming current monthly savings remain constant. It does NOT account for investment market returns, inflation, taxes, or future changes in income and expenses.`,
       color: colors.primary,
     });
 
-    // Render Insights Cards
+    // Render Insights Cards with Dynamic Heights & Text Wrapping
     insights.forEach((ins) => {
+      doc.setFontSize(8.5);
+      doc.setFont(activeFont, 'normal');
+      const splitDesc = doc.splitTextToSize(ins.desc, contentWidth - 14);
+      const cardHeight = Math.max(24, 13 + (splitDesc.length * 3.8));
+
       doc.setFillColor(...colors.lightBg);
       doc.setDrawColor(...colors.cardBorder);
-      doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'FD');
+      doc.roundedRect(margin, y, contentWidth, cardHeight, 2, 2, 'FD');
 
-      // Left Color Accent
       doc.setFillColor(...ins.color);
-      doc.roundedRect(margin, y, 3, 30, 1.5, 1.5, 'F');
+      doc.roundedRect(margin, y, 3, cardHeight, 1.5, 1.5, 'F');
 
-      // Header Tag
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setFont(activeFont, 'bold');
+      doc.setTextColor(...ins.color);
+      doc.text(`[${ins.tag}]`, margin + 7, y + 6);
+
+      doc.setFontSize(9.5);
+      doc.setFont(activeFont, 'bold');
       doc.setTextColor(...colors.textDark);
-      doc.text(ins.title, margin + 7, y + 8);
+      doc.text(ins.title, margin + 42, y + 6);
 
-      // Description
       doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(activeFont, 'normal');
       doc.setTextColor(...colors.textMuted);
-      const splitDesc = doc.splitTextToSize(ins.desc, contentWidth - 14);
-      doc.text(splitDesc, margin + 7, y + 15);
+      doc.text(splitDesc, margin + 7, y + 13);
 
-      y += 36;
+      y += cardHeight + 5;
     });
 
-    // Disclaimer Box at Bottom of Page 3
-    doc.setFillColor(254, 243, 199); // amber soft
+    // Legal Financial Disclaimer Box anchored at bottom
+    const disclaimerY = pageHeight - 42;
+    doc.setFillColor(254, 243, 199); // soft amber
     doc.setDrawColor(252, 211, 77);
-    doc.roundedRect(margin, pageHeight - 45, contentWidth, 24, 2, 2, 'FD');
+    doc.roundedRect(margin, disclaimerY, contentWidth, 26, 2, 2, 'FD');
 
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(217, 119, 6);
+    doc.roundedRect(margin, disclaimerY, 3, 26, 1.5, 1.5, 'F');
+
+    doc.setFontSize(8);
+    doc.setFont(activeFont, 'bold');
     doc.setTextColor(180, 83, 9);
-    doc.text('⚖️ Legal Financial Disclaimer', margin + 5, pageHeight - 38);
+    doc.text('[LEGAL FINANCIAL DISCLAIMER]', margin + 7, disclaimerY + 6.5);
 
     doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(activeFont, 'normal');
     doc.setTextColor(120, 53, 15);
-    const disclaimerText = 'This report is generated automatically by Finora based on user-entered financial logs. It does not constitute certified investment advice, tax counseling, or formal financial planning. Always consult an accredited financial professional before executing major investment decisions.';
-    doc.text(doc.splitTextToSize(disclaimerText, contentWidth - 10), margin + 5, pageHeight - 32);
+    const disclaimerText = 'This financial report is generated automatically by Finora based on user-entered financial logs. It does not constitute certified investment advice, tax counseling, or formal financial planning. Always consult an accredited financial professional before executing major financial decisions.';
+    const splitDisclaimer = doc.splitTextToSize(disclaimerText, contentWidth - 14);
+    doc.text(splitDisclaimer, margin + 7, disclaimerY + 13);
 
     // Save PDF
     const filename = `Finora_Financial_Report_${user.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
