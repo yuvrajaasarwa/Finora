@@ -3,6 +3,15 @@
 
 let cachedRobotoBase64 = null;
 
+function isValidTTF(bytes) {
+  if (!bytes || bytes.length < 1000) return false;
+  // Check TTF (0x00 0x01 0x00 0x00) or OTTO (0x4F 0x54 0x54 0x4F) or wOF (0x77 0x4F 0x46)
+  const isTrueType = (bytes[0] === 0 && bytes[1] === 1 && bytes[2] === 0 && bytes[3] === 0);
+  const isOpenType = (bytes[0] === 0x4F && bytes[1] === 0x54 && bytes[2] === 0x54 && bytes[3] === 0x4F);
+  const isWoff = (bytes[0] === 0x77 && bytes[1] === 0x4F && bytes[2] === 0x46);
+  return isTrueType || isOpenType || isWoff;
+}
+
 /**
  * Loads and registers the Roboto Unicode font into jsPDF so Indian Rupee (₹)
  * and all standard extended characters render natively without corruption.
@@ -11,32 +20,50 @@ async function ensureUnicodeFont(doc) {
   try {
     if (!cachedRobotoBase64) {
       if (typeof window !== 'undefined' && window.fetch) {
-        const res = await fetch('/fonts/Roboto-Regular.ttf');
-        if (res.ok) {
-          const buf = await res.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          let binary = '';
-          const chunkSize = 8192;
-          for (let i = 0; i < bytes.length; i += chunkSize) {
-            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        const fontPaths = ['/fonts/Roboto-Regular.ttf', '/fonts/roboto-regular.ttf', '/Fonts/Roboto-Regular.ttf'];
+        for (const fontUrl of fontPaths) {
+          try {
+            const res = await fetch(fontUrl);
+            if (res.ok) {
+              const buf = await res.arrayBuffer();
+              const bytes = new Uint8Array(buf);
+              if (isValidTTF(bytes)) {
+                let binary = '';
+                const chunkSize = 8192;
+                for (let i = 0; i < bytes.length; i += chunkSize) {
+                  binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+                }
+                cachedRobotoBase64 = btoa(binary);
+                break;
+              } else {
+                console.warn(`Font request at ${fontUrl} returned non-TTF binary/HTML data.`);
+              }
+            }
+          } catch (e) {
+            // Ignore and try next path
           }
-          cachedRobotoBase64 = btoa(binary);
         }
       }
     }
     if (cachedRobotoBase64) {
-      doc.addFileToVFS('Roboto-Regular.ttf', cachedRobotoBase64);
-      // Register all styles to prevent fallback to standard Helvetica on bold text
-      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold');
-      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'italic');
-      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bolditalic');
-      doc.setFont('Roboto', 'normal');
-      return true;
+      try {
+        doc.addFileToVFS('Roboto-Regular.ttf', cachedRobotoBase64);
+        // Register all styles to prevent fallback to standard Helvetica on bold text
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold');
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'italic');
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bolditalic');
+        doc.setFont('Roboto', 'normal');
+        return true;
+      } catch (fontErr) {
+        console.warn('jsPDF addFont failed, resetting cache:', fontErr);
+        cachedRobotoBase64 = null;
+      }
     }
   } catch (err) {
     console.warn('Could not load custom Roboto font for jsPDF:', err);
   }
+  try { doc.setFont('helvetica', 'normal'); } catch (e) {}
   return false;
 }
 
