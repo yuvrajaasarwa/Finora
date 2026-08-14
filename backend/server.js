@@ -31,17 +31,28 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().t
 // -----------------------------
 const frontendDir = path.join(__dirname, '..', 'frontend');
 
-// Handle Linux case-sensitivity for /css and /js routes
+// Handle Linux case-sensitivity for /css, /js, and /fonts routes
 app.use('/css', express.static(path.join(frontendDir, 'Css')));
 app.use('/css', express.static(path.join(frontendDir, 'css')));
 app.use('/js', express.static(path.join(frontendDir, 'JS')));
 app.use('/js', express.static(path.join(frontendDir, 'js')));
+app.use('/fonts', express.static(path.join(frontendDir, 'fonts')));
+app.use('/fonts', express.static(path.join(frontendDir, 'Fonts')));
 app.use(express.static(frontendDir));
 
-// Fallback: serve specific html files or index.html
+// Fallback: serve specific html files or index.html (do not serve index.html for missing static assets)
 app.get(/^\/(?!api).*/, (req, res) => {
   const reqPath = req.path.replace(/^\//, '');
   const filePath = path.join(frontendDir, reqPath);
+
+  // If requesting a static asset file that doesn't exist, return 404 instead of SPA index.html fallback
+  if (/\.(ttf|woff|woff2|eot|css|js|png|jpg|jpeg|gif|svg|ico)$/i.test(reqPath)) {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      return res.sendFile(filePath);
+    }
+    return res.status(404).send('Static asset not found');
+  }
+
   if (reqPath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     return res.sendFile(filePath);
   }
