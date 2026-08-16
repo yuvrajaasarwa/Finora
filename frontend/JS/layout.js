@@ -146,3 +146,34 @@ function renderSidebar(active) {
   const activeLink = links.find(l => l.key === active);
   renderTopBar(activeLink ? activeLink.label : '');
 }
+
+function fmtMoney(amount, currency) {
+  const num = parseFloat(amount || 0);
+  const user = (typeof Auth !== 'undefined' && Auth.user) ? Auth.user : {};
+  const curr = currency || user.currency || 'INR';
+  const symbolMap = {
+    INR: '₹',
+    USD: '$',
+    EUR: '€',
+    GBP: '£'
+  };
+  const symbol = symbolMap[curr] || (curr === 'INR' ? '₹' : '$');
+  return `${symbol}${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+if (typeof window !== 'undefined') {
+  window.fmtMoney = fmtMoney;
+  window.fmtDate = fmtDate;
+  window.todayISO = todayISO;
+}
