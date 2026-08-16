@@ -10,11 +10,10 @@ async function auth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = await db.get(
-      'SELECT id, name, email, role, currency FROM users WHERE id = ?',
-      [payload.sub]
-    );
-    if (!user) return res.status(401).json({ error: 'Invalid token user' });
+    const userDoc = await db.User.findById(payload.sub);
+    if (!userDoc) return res.status(401).json({ error: 'Invalid token user' });
+    const user = userDoc.toJSON();
+    delete user.password_hash;
     req.user = user;
     next();
   } catch (err) {
