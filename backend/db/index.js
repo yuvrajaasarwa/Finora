@@ -56,6 +56,7 @@ async function init() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       title TEXT NOT NULL,
+      frequency TEXT DEFAULT 'daily',
       target_days INTEGER DEFAULT 30,
       completed_days INTEGER DEFAULT 0,
       streak INTEGER DEFAULT 0,
@@ -173,6 +174,9 @@ function runMigrations(database) {
   cols = getCols('habits');
   if (cols.length > 0 && !cols.includes('title')) {
     database.exec("ALTER TABLE habits ADD COLUMN title TEXT DEFAULT 'Habit'");
+  }
+  if (cols.length > 0 && !cols.includes('frequency')) {
+    database.exec("ALTER TABLE habits ADD COLUMN frequency TEXT DEFAULT 'daily'");
   }
   if (cols.length > 0 && !cols.includes('target_days')) {
     database.exec('ALTER TABLE habits ADD COLUMN target_days INTEGER DEFAULT 30');
