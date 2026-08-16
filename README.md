@@ -29,7 +29,7 @@ Traditional expense trackers log transactions passively after money is already s
 
 ## 🔗 Project Navigation & Links
 
-- **🚀 Live Demo**: *Coming soon* (Local deployment runs at `http://localhost:8000`)
+- **🚀 Live Demo**: https://finora-zvi3.onrender.com
 - **📄 Legal Documentation**: [Privacy Policy](frontend/privacy.html) • [Terms of Service](frontend/terms.html)
 
 ---
