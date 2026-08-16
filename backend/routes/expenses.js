@@ -8,7 +8,13 @@ const router = express.Router();
 router.get('/', auth, async (req, res, next) => {
   try {
     const rows = db.query('SELECT * FROM expenses WHERE user_id = ? ORDER BY date DESC, id DESC', [req.user.id]);
-    return res.json(rows);
+    const formatted = rows.map(r => ({
+      ...r,
+      title: r.title || r.category || 'Expense',
+      note: r.notes || r.note || '',
+      notes: r.notes || r.note || ''
+    }));
+    return res.json(formatted);
   } catch (err) {
     next(err);
   }
@@ -17,21 +23,27 @@ router.get('/', auth, async (req, res, next) => {
 // POST /api/expenses
 router.post('/', auth, async (req, res, next) => {
   try {
-    const { title, amount, category, date, notes } = req.body || {};
-    if (!title || amount === undefined) {
-      return res.status(400).json({ error: 'Title and amount are required' });
+    const { title, amount, category, date, notes, note } = req.body || {};
+    if (amount === undefined || amount === null || amount === '') {
+      return res.status(400).json({ error: 'Amount is required' });
     }
 
     const numAmount = parseFloat(amount);
     const entryDate = date || new Date().toISOString().split('T')[0];
+    const itemTitle = title || category || 'Expense';
+    const itemNote = notes || note || '';
 
     const result = db.run(
       'INSERT INTO expenses (user_id, title, amount, category, date, notes) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.user.id, title, numAmount, category || 'Other', entryDate, notes || '']
+      [req.user.id, itemTitle, numAmount, category || 'Other', entryDate, itemNote]
     );
 
     const newItem = db.get('SELECT * FROM expenses WHERE id = ?', [result.lastInsertRowid]);
-    return res.status(201).json(newItem);
+    return res.status(201).json({
+      ...newItem,
+      note: newItem.notes || '',
+      notes: newItem.notes || ''
+    });
   } catch (err) {
     next(err);
   }
