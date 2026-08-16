@@ -8,7 +8,12 @@ const router = express.Router();
 router.get('/', auth, async (req, res, next) => {
   try {
     const rows = db.query('SELECT * FROM income WHERE user_id = ? ORDER BY date DESC, id DESC', [req.user.id]);
-    return res.json(rows);
+    const formatted = rows.map(r => ({
+      ...r,
+      note: r.notes || r.note || '',
+      notes: r.notes || r.note || ''
+    }));
+    return res.json(formatted);
   } catch (err) {
     next(err);
   }
@@ -17,21 +22,26 @@ router.get('/', auth, async (req, res, next) => {
 // POST /api/income
 router.post('/', auth, async (req, res, next) => {
   try {
-    const { source, amount, frequency, date, category, notes } = req.body || {};
-    if (!source || amount === undefined) {
+    const { source, amount, frequency, date, category, notes, note } = req.body || {};
+    if (!source || amount === undefined || amount === null || amount === '') {
       return res.status(400).json({ error: 'Source and amount are required' });
     }
 
     const numAmount = parseFloat(amount);
     const entryDate = date || new Date().toISOString().split('T')[0];
+    const itemNote = notes || note || '';
 
     const result = db.run(
       'INSERT INTO income (user_id, source, amount, frequency, date, category, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.user.id, source, numAmount, frequency || 'monthly', entryDate, category || 'General', notes || '']
+      [req.user.id, source, numAmount, frequency || 'monthly', entryDate, category || 'General', itemNote]
     );
 
     const newItem = db.get('SELECT * FROM income WHERE id = ?', [result.lastInsertRowid]);
-    return res.status(201).json(newItem);
+    return res.status(201).json({
+      ...newItem,
+      note: newItem.notes || '',
+      notes: newItem.notes || ''
+    });
   } catch (err) {
     next(err);
   }
