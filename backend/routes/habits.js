@@ -7,13 +7,15 @@ const router = express.Router();
 function formatHabit(h) {
   const today = new Date().toISOString().split('T')[0];
   const habitName = h.title || h.name || 'Habit';
+  const targetVal = h.target_amount !== undefined && h.target_amount !== null ? h.target_amount : (h.target_days || 0);
   return {
     ...h,
     name: habitName,
     title: habitName,
     frequency: h.frequency || 'daily',
     completed_today: h.last_completed === today,
-    target_days: h.target_days || 30
+    target_days: h.target_days || 30,
+    target_amount: targetVal
   };
 }
 
@@ -37,10 +39,11 @@ router.post('/', auth, async (req, res, next) => {
     }
 
     const targetDaysNum = parseInt(target_days || target_amount, 10) || 30;
+    const habitFreq = frequency || 'daily';
 
     const result = db.run(
-      'INSERT INTO habits (user_id, title, target_days, category) VALUES (?, ?, ?, ?)',
-      [req.user.id, habitTitle, targetDaysNum, category || 'Financial']
+      'INSERT INTO habits (user_id, title, target_days, category, frequency) VALUES (?, ?, ?, ?, ?)',
+      [req.user.id, habitTitle, targetDaysNum, category || 'Financial', habitFreq]
     );
 
     const newItem = db.get('SELECT * FROM habits WHERE id = ?', [result.lastInsertRowid]);
