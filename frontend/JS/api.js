@@ -21,6 +21,11 @@ const Auth = {
   logout() {
     this.clear();
     window.location.href = '/login.html';
+  },
+  requireLogin() {
+    if (!this.token) {
+      window.location.href = '/login.html';
+    }
   }
 };
 
