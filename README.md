@@ -4,7 +4,7 @@
 
 ![Node.js](https://img.shields.io/badge/Node.js-v20.0+-339933?style=flat-square&logo=nodedotjs&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-v4.19-000000?style=flat-square&logo=express&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-LibSQL-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
@@ -29,7 +29,7 @@ Traditional expense trackers log transactions passively after money is already s
 
 ## 🔗 Project Navigation & Links
 
-- **🚀 Live Demo**: https://finora-qzdk.onrender.com
+- **🚀 Live Demo**: *Coming soon* (Local deployment runs at `http://localhost:8000`)
 - **📄 Legal Documentation**: [Privacy Policy](frontend/privacy.html) • [Terms of Service](frontend/terms.html)
 
 ---
@@ -55,7 +55,7 @@ Traditional expense trackers log transactions passively after money is already s
 - **User Registration**: Quick registration specifying display name, email, password, and preferred currency.
 - **JWT Authentication**: Stateless session management using signed JSON Web Tokens (`jsonwebtoken`).
 - **Protected Routes**: Client-side and server-side authorization guards preventing unauthenticated access.
-- **Data Isolation**: Database queries strictly isolated to the authenticated user (`WHERE user_id = ?`).
+- **Data Isolation**: Database queries strictly isolated to the authenticated user (`{ user_id: req.user.id }`).
 
 ### 📊 Interactive Financial Dashboard
 - **Executive Summary Cards**: Instant visibility into Net Worth, Monthly Income, Monthly Expenses, Total Savings, and Savings Rate %.
@@ -90,16 +90,24 @@ Traditional expense trackers log transactions passively after money is already s
 
 ## ✨ What's New in Finora
 
+### 📄 Vector PDF Financial Report Exporter (`pdfReport.js` & `robotoFont.js`)
+- **Native Indian Rupee (`₹`) Symbol**: High-resolution 16-bit CID Unicode font embedding (`Identity-H` encoding) delivering native Indian Rupee (`₹`) symbol rendering across all financial figures (e.g. `₹ 1,43,000.00`).
+- **Dynamic Box Heights & Margin Alignment**: Rebuilt layout engine automatically calculating text block bounds to prevent mid-word cut-offs and line clipping.
+- **Aspect-Ratio Preserved Charts**: Cash flow chart snapshots capture at 1:1 crisp resolution maintaining exact canvas dimensions without squashing or distortion.
+- **Page 1 — Financial Overview**: Executive Header, Net Worth summary, Cash Flow metrics, Savings Rate %, Position Highlights table, and Summary narrative.
+- **Page 2 — Detailed Breakdown**: Expense category breakdown, Top 10 recent transactions, Goals progress, Habit completion summary, and embedded Cash Flow chart image snapshot.
+- **Page 3 — Insights & Recommendations**: Automated rule-based insights (spending concentration warnings, savings rate benchmarks, habit tips, 12-month net worth projection), and legal financial disclaimer.
+
+### 🍃 MongoDB Database Architecture (`Mongoose` & `mongodb-memory-server`)
+- **Document-Oriented Schemas**: Fully migrated database layer from SQLite to MongoDB utilizing Mongoose ODM schemas for User, Income, Expense, Habit, HabitLog, Goal, Investment, and Feedback entities.
+- **Environment Connection Flexibility**: Connects seamlessly to local MongoDB or cloud instances (MongoDB Atlas) via `MONGODB_URI`.
+- **Zero-Setup Memory Fallback**: Automatically spins up an in-memory MongoDB instance (`mongodb-memory-server`) if a local MongoDB daemon is not running, ensuring instant out-of-the-box local development and automated Playwright testing.
+
 ### ⚙️ Dedicated Account Settings (`/settings.html`)
 - **Profile Management**: Edit full name, email address, and phone number.
 - **Financial Preferences**: Set default currency (INR ₹, USD $, EUR €, GBP £, AED, SGD), monthly income targets, and savings targets.
 - **Security Controls**: In-app password change form with current password verification.
 - **Data Privacy & GDPR Controls**: Quick actions to export personal data (JSON) or request account deletion.
-
-### 📄 3-Page Printable PDF Financial Report (`pdfReport.js`)
-- **Page 1 — Financial Overview**: Executive Header, Net Worth summary, Cash Flow metrics, Savings Rate %, Position Highlights table, and Summary narrative.
-- **Page 2 — Detailed Breakdown**: Expense category breakdown, Top 10 recent transactions, Goals progress, Habit completion summary, and embedded Cash Flow chart image snapshot.
-- **Page 3 — Insights & Recommendations**: Automated rule-based insights (spending concentration warnings, savings rate benchmarks, habit tips, 12-month net worth projection), and legal financial disclaimer.
 
 ### 🔒 Privacy & Data Controls
 - **Cookie Consent Banner** (`cookieConsent.js`): Non-intrusive floating cookie banner saving user preferences.
@@ -125,10 +133,10 @@ Traditional expense trackers log transactions passively after money is already s
 | **Frontend** | HTML5, Vanilla JavaScript (ES6+) | User interface, client logic, and DOM rendering |
 | **Styling** | CSS3 (Design System Tokens) | Responsive fintech design, light/dark themes, CSS Grid/Flexbox |
 | **Backend** | Node.js (>=20.0.0), Express.js | REST API endpoints, routing, and static file delivery |
-| **Database** | SQLite (`@libsql/client` & `better-sqlite3`) | Embedded SQL database for persistence and schema migrations |
+| **Database** | MongoDB & Mongoose ODM | Document-oriented database for persistence with memory fallback |
 | **Authentication** | `jsonwebtoken`, `bcryptjs` | Signed JWT tokens and password hash comparison |
 | **PDF Generation** | `jsPDF`, `jspdf-autotable` | Client-side 3-page printable PDF financial report exporter |
-| **Charts** | HTML5 Canvas / Custom SVG | Financial visualization charts |
+| **Charts** | HTML5 Canvas / Chart.js | Financial visualization charts |
 
 ---
 
@@ -152,11 +160,11 @@ Traditional expense trackers log transactions passively after money is already s
 │      /api/analytics  /api/admin        /api/feedback      │
 └─────────────────────────────┬─────────────────────────────┘
                               │
-                     Parameterized SQL Queries
+                     Mongoose Queries / ODM
                               │
 ┌─────────────────────────────▼─────────────────────────────┐
-│                     SQLite Database                       │
-│             (data.sqlite via @libsql/client)              │
+│                     MongoDB Database                      │
+│     (Local / Atlas / In-Memory Fallback via Mongoose)     │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -168,10 +176,17 @@ Traditional expense trackers log transactions passively after money is already s
 y:\wealth pulse\wealthpulse-main/
 ├── backend/
 │   ├── db/
-│   │   ├── index.js          # SQLite client, table schemas, migrations & admin seeder
-│   │   └── data.sqlite       # Local persistent SQLite database file
+│   │   └── index.js          # Mongoose connection manager, memory fallback & admin seeder
 │   ├── middleware/
 │   │   └── auth.js           # JWT authentication & admin authorization guards
+│   ├── models/
+│   │   ├── expense.js        # Mongoose Expense schema
+│   │   ├── feedback.js       # Mongoose Feedback schema
+│   │   ├── goal.js           # Mongoose Goal schema
+│   │   ├── habit.js          # Mongoose Habit & HabitLog schemas
+│   │   ├── income.js         # Mongoose Income schema
+│   │   ├── investment.js     # Mongoose Investment schema
+│   │   └── user.js           # Mongoose User schema
 │   ├── routes/
 │   │   ├── admin.js          # Admin stats, user management & feedback tickets
 │   │   ├── analytics.js      # Consolidated net worth & cash flow analytics
@@ -184,16 +199,16 @@ y:\wealth pulse\wealthpulse-main/
 │   │   ├── investments.js    # Asset portfolio endpoints
 │   │   └── seo.js            # IndexNow URL submission endpoint
 │   ├── .env.example          # Environment variables template
-│   ├── package.json          # Node scripts & dependencies
 │   └── server.js             # Express server entry point
 ├── frontend/
 │   ├── Css/
 │   │   └── styles.css        # Design tokens, light/dark theme rules & component layout
 │   ├── JS/
-│   │   ├── api.js            # API fetch utility & authentication state manager
+│   │   ├── api.js            # API fetch utility & Indian Rupee (₹) monetary formatter
 │   │   ├── cookieConsent.js  # Floating GDPR cookie consent banner
 │   │   ├── layout.js         # Sidebar navigation, top bar & theme toggle manager
-│   │   └── pdfReport.js      # 3-Page printable PDF report generator
+│   │   ├── pdfReport.js      # 3-Page printable PDF report generator
+│   │   └── robotoFont.js     # Base64 embedded Roboto font for native ₹ symbol support
 │   ├── admin.html            # Admin Command Panel
 │   ├── analytics.html        # Wealth Analytics & Net Worth Trajectory
 │   ├── dashboard.html        # Financial Dashboard
@@ -222,6 +237,7 @@ y:\wealth pulse\wealthpulse-main/
 ### Prerequisites
 - **Node.js**: `v20.0.0` or higher
 - **npm**: `v9.0.0` or higher
+- **MongoDB** *(Optional; automatic in-memory fallback runs if local Mongo is not installed)*
 - **Git**
 
 ### Step-by-Step Installation
@@ -232,9 +248,8 @@ y:\wealth pulse\wealthpulse-main/
    cd <project-folder>
    ```
 
-2. **Install Backend Dependencies**:
+2. **Install Application Dependencies**:
    ```bash
-   cd backend
    npm install
    ```
 
@@ -244,8 +259,9 @@ y:\wealth pulse\wealthpulse-main/
    PORT=8000
    JWT_SECRET=your_jwt_secret_key_here
    JWT_EXPIRES_IN=7d
-   ADMIN_EMAIL=admin@example.com
-   ADMIN_PASSWORD=change_this_password
+   ADMIN_EMAIL=admin@financetrack.com
+   ADMIN_PASSWORD=Admin@12345
+   MONGODB_URI=mongodb://127.0.0.1:27017/wealthpulse
    ```
 
 4. **Start the Application**:
@@ -269,26 +285,27 @@ y:\wealth pulse\wealthpulse-main/
 | `PORT` | Server port | Yes | `8000` |
 | `JWT_SECRET` | Secret key for JWT signing | Yes | `your_jwt_secret_key_here` |
 | `JWT_EXPIRES_IN` | JWT token validity duration | No | `7d` |
-| `ADMIN_EMAIL` | Admin account email for auto-seeding | No | `admin@example.com` |
-| `ADMIN_PASSWORD` | Admin account password for auto-seeding | No | `change_this_password` |
+| `ADMIN_EMAIL` | Admin account email for auto-seeding | No | `admin@financetrack.com` |
+| `ADMIN_PASSWORD` | Admin account password for auto-seeding | No | `Admin@12345` |
+| `MONGODB_URI` | MongoDB connection URL | No | `mongodb://127.0.0.1:27017/wealthpulse` |
 
 > ⚠️ **Security Warning**: Never commit your real `.env` file or production secrets to Git repositories.
 
 ---
 
-## 🗄️ Database & Auto-Seeding
+## 🗄️ Database Collections & Auto-Seeding
 
-Finora uses embedded **SQLite** managed through `@libsql/client` and `better-sqlite3`. Table creation and migrations run automatically upon database initialization (`db.init()`).
+Finora uses **MongoDB** managed through Mongoose ODM. If a local MongoDB instance is not running, Finora automatically initializes an in-memory MongoDB database instance (`mongodb-memory-server`).
 
-### Database Tables:
+### Mongoose Collections:
 - `users`: Account identity, role (`user`/`admin`), currency, phone, and target preferences.
-- `income`: Cash inflow transactions (`source`, `amount`, `date`, `note`).
+- `incomes`: Cash inflow transactions (`source`, `amount`, `date`, `note`).
 - `expenses`: Cash outflow transactions (`category`, `amount`, `date`, `note`).
 - `habits`: Habit definitions (`name`, `frequency`, `target_amount`).
-- `habit_logs`: Daily habit completion records (`habit_id`, `completed_on`).
+- `habitlogs`: Daily habit completion records (`habit_id`, `completed_on`).
 - `goals`: Sinking fund goal milestones (`title`, `target_amount`, `saved_amount`, `deadline`).
 - `investments`: Portfolio assets (`asset_name`, `asset_type`, `amount_invested`, `current_value`, `date`).
-- `feedback`: User feedback tickets (`message`, `status`).
+- `feedbacks`: User feedback tickets (`message`, `status`).
 
 ### Administrative Auto-Seeding:
 If no database record exists for `ADMIN_EMAIL`, Finora automatically seeds a default administrator user on startup.
@@ -323,7 +340,7 @@ If no database record exists for `ADMIN_EMAIL`, Finora automatically seeds a def
 | :--- | :--- | :--- | :---: |
 | `GET` | `/api/habits` | List habits with streak calculations | Yes |
 | `POST` | `/api/habits` | Create financial habit rule | Yes |
-| `POST` | `/api/habits/:id/toggle` | Toggle completion status for a date | Yes |
+| `POST` | `/api/habits/:id/complete` | Complete habit for a specific date | Yes |
 | `DELETE` | `/api/habits/:id` | Delete habit rule | Yes |
 
 ### Goals & Sinking Funds (`/api/goals`)
@@ -331,7 +348,7 @@ If no database record exists for `ADMIN_EMAIL`, Finora automatically seeds a def
 | :--- | :--- | :--- | :---: |
 | `GET` | `/api/goals` | List savings goals | Yes |
 | `POST` | `/api/goals` | Create savings goal milestone | Yes |
-| `PATCH` | `/api/goals/:id/add-money` | Add deposit contribution to goal | Yes |
+| `PATCH` | `/api/goals/:id/contribute` | Add deposit contribution to goal | Yes |
 | `DELETE` | `/api/goals/:id` | Delete goal | Yes |
 
 ### Asset Portfolio (`/api/investments`)
@@ -339,6 +356,7 @@ If no database record exists for `ADMIN_EMAIL`, Finora automatically seeds a def
 | :--- | :--- | :--- | :---: |
 | `GET` | `/api/investments` | List investment holdings | Yes |
 | `POST` | `/api/investments` | Log asset investment | Yes |
+| `PATCH` | `/api/investments/:id` | Update current market valuation | Yes |
 | `DELETE` | `/api/investments/:id` | Delete asset entry | Yes |
 
 ### Analytics & Feedback (`/api/analytics`, `/api/feedback`)
@@ -346,7 +364,7 @@ If no database record exists for `ADMIN_EMAIL`, Finora automatically seeds a def
 | :--- | :--- | :--- | :---: |
 | `GET` | `/api/analytics/summary` | Consolidated financial analytics metrics | Yes |
 | `POST` | `/api/feedback` | Submit feedback ticket | Yes / Public |
-| `GET` | `/api/feedback` | List submitted feedback entries | Yes |
+| `GET` | `/api/admin/feedback` | List submitted feedback entries | Admin |
 
 ### Admin Command (`/api/admin`)
 | Method | Endpoint | Description | Auth Required |
@@ -369,8 +387,8 @@ If no database record exists for `ADMIN_EMAIL`, Finora automatically seeds a def
 
 - **Password Hashing**: Passwords stored as salted hashes using `bcryptjs` (10 rounds).
 - **JWT Authorization**: Stateless HTTP Bearer authentication token guards.
-- **SQL Injection Prevention**: Parameterized database queries across all SQLite calls.
-- **User Data Isolation**: Queries strictly isolated by user ID (`WHERE user_id = ?`).
+- **NoSQL Injection & Data Validation**: Schema-level validation and query sanitization via Mongoose.
+- **User Data Isolation**: Queries strictly isolated by user ID (`{ user_id: req.user.id }`).
 - **Role-Based Admin Access**: Administrative endpoints guarded by role checks (`role === 'admin'`).
 - **Privacy-Oriented Controls**: Features inspired by GDPR principles including JSON Data Export and Account Deletion.
 - **Zero Bank Credentials**: No requirement to connect real bank accounts or credentials.
@@ -422,7 +440,7 @@ Evaluators can verify Finora's core workflows using the following manual testing
 - [ ] **Habit Completion**: Navigate to `/habits.html`. Create a custom habit and toggle today's completion. Verify streak calculation.
 - [ ] **Goal Contribution**: Navigate to `/goals.html`. Add money to a savings goal and verify target percentage updates.
 - [ ] **Asset Management**: Navigate to `/investments.html`. Log an asset holding and check Net Worth aggregation.
-- [ ] **PDF Report Download**: Click **📄 Download Report (PDF)** in the top bar. Verify that a 3-page printable PDF report generates.
+- [ ] **PDF Report Download**: Click **📄 Download Report (PDF)** in the top bar. Verify that a 3-page printable PDF report generates with native `₹` symbols and clean layout bounds.
 - [ ] **Account Settings**: Navigate to `/settings.html`. Test updating profile info, changing password, and downloading JSON data export.
 - [ ] **Admin Dashboard**: Sign in with an admin account and open `/admin.html`. Verify user directory listing and feedback resolution.
 
@@ -434,9 +452,9 @@ Finora is deployment-ready for platforms such as **Render**, **Vercel**, or stan
 
 ### Render Deployment
 1. Connect repository to Render as a **Web Service**.
-2. Set Build Command: `cd backend && npm install`
-3. Set Start Command: `cd backend && node server.js`
-4. Set Environment Variables (`PORT`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+2. Set Build Command: `npm install`
+3. Set Start Command: `node backend/server.js`
+4. Set Environment Variables (`PORT`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MONGODB_URI`).
 
 ---
 

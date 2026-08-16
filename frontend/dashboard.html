@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · Finora Financial Habit Builder</title>
+  <meta name="description"
+    content="View your net worth summary, monthly cash flow, category expenses, and habit progress on Finora." />
+  <link rel="canonical" href="https://wealthpulse.app/dashboard.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Dashboard · Finora" />
+  <meta property="og:description" content="Real-time financial dashboard and net worth tracker." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://wealthpulse.app/dashboard.html" />
+  <meta property="og:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Dashboard · Finora" />
+  <meta name="twitter:description" content="Financial dashboard for tracking wealth velocity and habit streaks." />
+  <meta name="twitter:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- jsPDF & autoTable for Report PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="sidebar"></aside>
+
+    <main class="main">
+      <!-- Page Header with Humanized Greetings & Quick Actions -->
+      <div class="page-header">
+        <div>
+          <div class="flex gap-8" style="align-items: center; margin-bottom: 4px;">
+            <span class="badge blue" id="greeting-time">Financial Overview</span>
+          </div>
+          <h1 data-testid="page-title">Welcome back<span id="user-name-suffix"></span> 👋</h1>
+          <p>Here is your real-time net worth trajectory and daily habit accountability.</p>
+        </div>
+        <div class="pill-buttons">
+          <a class="btn btn-ghost btn-sm" href="/habits.html" data-testid="quick-habit-btn">⚡ Daily Habits</a>
+          <a class="btn btn-primary btn-sm" href="/expenses.html" data-testid="quick-add-expense">+ Log Cash Flow</a>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="grid cols-4" id="stat-cards">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="grid cols-2 mt-24">
+        <div class="card">
+          <div class="flex between mb-16">
+            <div>
+              <h2>Cash Flow Dynamics</h2>
+              <div style="font-size: 12px; color: var(--text-muted);">Monthly Income vs Actual Spending</div>
+            </div>
+            <span class="badge green">Real-Time</span>
+          </div>
+          <div class="chart-box"><canvas id="cashflow-chart"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="flex between mb-16">
+            <div>
+              <h2>Expense Category Distribution</h2>
+              <div style="font-size: 12px; color: var(--text-muted);">Where your cash actually goes</div>
+            </div>
+            <span class="badge amber">Breakdown</span>
+          </div>
+          <div class="chart-box"><canvas id="category-chart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Habits & Goals Row -->
+      <div class="grid cols-2 mt-24">
+        <div class="card">
+          <div class="flex between mb-16">
+            <div>
+              <h2>Habit Streaks & Discipline</h2>
+              <div style="font-size: 12px; color: var(--text-muted);">Consistency drives compounding wealth</div>
+            </div>
+            <a class="badge green" href="/habits.html" data-testid="dashboard-habits-link">Manage Habits →</a>
+          </div>
+          <div id="habits-preview">
+            <div class="spinner"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex between mb-16">
+            <div>
+              <h2>Savings Goals & Milestones</h2>
+              <div style="font-size: 12px; color: var(--text-muted);">Target-based wealth building</div>
+            </div>
+            <a class="badge blue" href="/goals.html" data-testid="dashboard-goals-link">All Goals →</a>
+          </div>
+          <div id="goals-preview">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/robotoFont.js"></script>
+  <script src="/js/pdfReport.js"></script>
+  <script src="/js/cookieConsent.js"></script>
+  <script>
+    Auth.requireLogin();
+    renderSidebar('dashboard');
+
+    // Dynamic greeting based on time of day
+    const hour = new Date().getHours();
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greeting-time').textContent = timeGreeting;
+    document.getElementById('user-name-suffix').textContent = Auth.user ? ', ' + Auth.user.name.split(' ')[0] : '';
+
+    async function loadDashboard() {
+      const [summary, habits, goals] = await Promise.all([
+        api('/api/analytics/summary'),
+        api('/api/habits'),
+        api('/api/goals'),
+      ]);
+
+      // Stat Cards
+      const cards = [
+        { label: 'Total Net Worth', value: fmtMoney(summary.net_worth), cls: 'accent', delta: 'Savings + Investments' },
+        { label: 'Total Income', value: fmtMoney(summary.total_income), cls: 'green', delta: 'Logged Inflows' },
+        { label: 'Total Expenses', value: fmtMoney(summary.total_expense), cls: 'red', delta: 'Logged Outflows' },
+        { label: 'Habits Done Today', value: `${summary.habits_completed_today}/${summary.habit_count}`, cls: 'amber', delta: 'Daily Discipline' },
+      ];
+
+      document.getElementById('stat-cards').innerHTML = cards.map(c => `
+        <div class="card stat-card ${c.cls}" data-testid="stat-${c.label.toLowerCase().replace(/[^a-z]/g, '-')}">
+          <div class="label">${c.label}</div>
+          <div class="value">${c.value}</div>
+          <div class="delta">${c.delta}</div>
+        </div>
+      `).join('');
+
+      // Cash Flow Chart
+      const months = summary.monthly.map(m => m.month);
+      const income = summary.monthly.map(m => m.income);
+      const expense = summary.monthly.map(m => m.expense);
+      new Chart(document.getElementById('cashflow-chart'), {
+        type: 'bar',
+        data: {
+          labels: months.length ? months : ['Current Period'],
+          datasets: [
+            { label: 'Income', data: income.length ? income : [summary.total_income], backgroundColor: 'rgba(16, 185, 129, 0.85)', borderRadius: 4 },
+            { label: 'Expense', data: expense.length ? expense : [summary.total_expense], backgroundColor: 'rgba(244, 63, 94, 0.85)', borderRadius: 4 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#9ca3af' } } },
+          scales: {
+            x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+            y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          },
+        },
+      });
+
+      // Category Doughnut Chart
+      const cats = summary.category_breakdown;
+      new Chart(document.getElementById('category-chart'), {
+        type: 'doughnut',
+        data: {
+          labels: cats.length ? cats.map(c => c.category) : ['No expenses logged'],
+          datasets: [{
+            data: cats.length ? cats.map(c => c.total) : [1],
+            backgroundColor: [
+              '#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'
+            ],
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'right', labels: { color: '#9ca3af', boxWidth: 12 } } },
+        },
+      });
+
+      // Habits Preview
+      const habitsEl = document.getElementById('habits-preview');
+      if (!habits.length) {
+        habitsEl.innerHTML = `<div class="empty">No financial habits set yet. <a href="/habits.html">Create your first habit →</a></div>`;
+      } else {
+        habitsEl.innerHTML = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Habit Name</th>
+                <th>Frequency</th>
+                <th class="num">Streak</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${habits.slice(0, 5).map(h => `
+                <tr>
+                  <td><strong>${h.name}</strong></td>
+                  <td><span class="badge ${h.frequency === 'daily' ? 'blue' : 'amber'}">${h.frequency}</span></td>
+                  <td class="num">${h.streak} 🔥</td>
+                  <td>${h.completed_today ? '<span class="badge green">✓ Done Today</span>' : '<span class="badge">Pending</span>'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      // Goals Preview
+      const goalsEl = document.getElementById('goals-preview');
+      if (!goals.length) {
+        goalsEl.innerHTML = `<div class="empty">No savings goals created. <a href="/goals.html">Set a milestone goal →</a></div>`;
+      } else {
+        goalsEl.innerHTML = goals.slice(0, 5).map(g => `
+          <div class="mb-16">
+            <div class="flex between mb-8">
+              <div>
+                <strong>${g.title}</strong>
+                <span class="text-muted"> · ${fmtMoney(g.saved_amount)} of ${fmtMoney(g.target_amount)}</span>
+              </div>
+              <span class="badge ${g.progress_percent >= 100 ? 'green' : 'blue'}">${g.progress_percent}%</span>
+            </div>
+            <div class="progress">
+              <div style="width: ${Math.min(g.progress_percent, 100)}%; background: ${g.progress_percent >= 100 ? 'var(--success)' : 'var(--accent)'};"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    loadDashboard().catch(err => {
+      console.error(err);
+      document.getElementById('stat-cards').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    });
+  </script>
+</body>
+
+</html>

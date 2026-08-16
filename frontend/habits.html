@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Habits · Finora Financial Habit Builder</title>
+  <meta name="description"
+    content="Build consistent money habits, track daily streaks, and maintain financial discipline on Finora." />
+  <link rel="canonical" href="https://wealthpulse.app/habits.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Financial Habits · Finora" />
+  <meta property="og:description" content="Streak-based financial habit tracking and discipline building." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://wealthpulse.app/habits.html" />
+  <meta property="og:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Financial Habits · Finora" />
+  <meta name="twitter:description" content="Build compounding money habits with visual streaks." />
+  <meta name="twitter:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <!-- jsPDF & autoTable for Report PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="sidebar"></aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <div class="flex gap-8" style="align-items: center; margin-bottom: 4px;">
+            <span class="badge amber">⚡ Behavioral Compound System</span>
+          </div>
+          <h1>Financial Habit Builder</h1>
+          <p>Build disciplined money behaviors with streak tracking. Consistency produces exponential wealth.</p>
+        </div>
+      </div>
+
+      <!-- Quick Habit Presets -->
+      <div class="card mb-16" style="background: var(--bg-1);">
+        <div class="flex between mb-12">
+          <span style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Quick Habit Templates (1-Click
+            Fill):</span>
+        </div>
+        <div class="pill-buttons">
+          <button class="btn btn-ghost btn-sm"
+            onclick="applyTemplate('Auto-save ₹200 daily into Emergency Fund', 'daily', 200)">💰 Daily Micro-Save
+            (₹200)</button>
+          <button class="btn btn-ghost btn-sm"
+            onclick="applyTemplate('Log all daily transactions before bed', 'daily', 0)">📝 Daily Expense
+            Logging</button>
+          <button class="btn btn-ghost btn-sm"
+            onclick="applyTemplate('Transfer 15% to Index Fund SIP', 'weekly', 1500)">📈 Weekly Index SIP</button>
+          <button class="btn btn-ghost btn-sm"
+            onclick="applyTemplate('Review monthly subscription charges', 'monthly', 0)">🔍 Monthly Subscriptions
+            Check</button>
+        </div>
+      </div>
+
+      <!-- Create New Habit -->
+      <div class="card mb-16">
+        <div class="flex between mb-16">
+          <h2>Create a New Financial Habit</h2>
+          <span class="badge blue">Atomic Habits Method</span>
+        </div>
+        <form id="habit-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="h-name">Habit Name / Routine</label>
+              <input id="h-name" placeholder="e.g. Save ₹100 into liquid savings" required data-testid="habit-name" />
+            </div>
+            <div class="form-group">
+              <label for="h-frequency">Frequency</label>
+              <select id="h-frequency" data-testid="habit-frequency">
+                <option value="daily">Daily Habit</option>
+                <option value="weekly">Weekly Routine</option>
+                <option value="monthly">Monthly Checkpoint</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="h-target">Target Amount (Optional)</label>
+              <input id="h-target" type="number" min="0" step="0.01" placeholder="0.00" data-testid="habit-target" />
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit" data-testid="habit-submit">⚡ Create Financial Habit</button>
+        </form>
+      </div>
+
+      <!-- Active Habits Grid -->
+      <div id="habits-list" class="grid cols-2">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/robotoFont.js"></script>
+  <script src="/js/pdfReport.js"></script>
+  <script src="/js/cookieConsent.js"></script>
+  <script>
+    Auth.requireLogin();
+    renderSidebar('habits');
+
+    function applyTemplate(name, frequency, amount) {
+      document.getElementById('h-name').value = name;
+      document.getElementById('h-frequency').value = frequency;
+      document.getElementById('h-target').value = amount > 0 ? amount : '';
+      document.getElementById('h-name').focus();
+    }
+
+    async function loadHabits() {
+      const habits = await api('/api/habits');
+      const el = document.getElementById('habits-list');
+      if (!habits.length) {
+        el.innerHTML = `<div class="empty" style="grid-column: 1/-1;">You haven't created any financial habits yet. Choose a template or create your first one above ↑</div>`;
+        return;
+      }
+      el.innerHTML = habits.map(h => `
+        <div class="card" data-testid="habit-card-${h.id}">
+          <div class="flex between mb-12">
+            <div>
+              <h3 style="margin:0; font-size:16px;">${h.name}</h3>
+              <div class="text-muted" style="font-size:12.5px; margin-top:4px;">
+                <span class="badge ${h.frequency === 'daily' ? 'blue' : 'amber'}">${h.frequency.toUpperCase()}</span>
+                ${h.target_amount > 0 ? ` · Target: ${fmtMoney(h.target_amount)}` : ''}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size:22px; font-weight:700; font-family:var(--mono); color: var(--warning);">${h.streak} 🔥</div>
+              <div class="text-muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em;">Current Streak</div>
+            </div>
+          </div>
+          <div class="text-muted" style="font-size:12.5px;">Lifetime Completions: <strong>${h.total_completions}</strong></div>
+          <div class="flex gap-8 mt-16">
+            ${h.completed_today
+          ? '<button class="btn btn-success btn-sm" disabled>✓ Completed Today</button>'
+          : `<button class="btn btn-primary btn-sm" data-testid="complete-habit-${h.id}" onclick="completeHabit(${h.id})">✓ Mark Completed</button>`
+        }
+            <button class="btn btn-danger btn-sm" data-testid="delete-habit-${h.id}" onclick="deleteHabit(${h.id})">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function completeHabit(id) {
+      await api(`/api/habits/${id}/complete`, { method: 'POST', body: JSON.stringify({}) });
+      loadHabits();
+    }
+
+    async function deleteHabit(id) {
+      if (!confirm('Are you sure you want to delete this habit? All streak history will be permanently removed.')) return;
+      await api(`/api/habits/${id}`, { method: 'DELETE' });
+      loadHabits();
+    }
+
+    document.getElementById('habit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api('/api/habits', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: document.getElementById('h-name').value.trim(),
+            frequency: document.getElementById('h-frequency').value,
+            target_amount: document.getElementById('h-target').value || 0,
+          }),
+        });
+        e.target.reset();
+        loadHabits();
+      } catch (err) { alert(err.message); }
+    });
+
+    loadHabits();
+  </script>
+</body>
+
+</html>

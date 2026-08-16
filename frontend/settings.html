@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings · Finora Financial Habit Builder</title>
+  <meta name="description"
+    content="Manage your Finora profile, financial preferences, notification settings, security, and privacy data." />
+  <link rel="canonical" href="https://wealthpulse.app/settings.html" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Settings · Finora" />
+  <meta property="og:description" content="Account settings, profile details, and financial preferences." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://wealthpulse.app/settings.html" />
+  <meta property="og:image" content="https://wealthpulse.app/favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <!-- jsPDF & autoTable for Report PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="sidebar"></aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <div class="flex gap-8" style="align-items: center; margin-bottom: 4px;">
+            <span class="badge blue">⚙️ Account Settings</span>
+          </div>
+          <h1>Account & Financial Preferences</h1>
+          <p>Manage your profile, financial targets, security controls, and data privacy options.</p>
+        </div>
+      </div>
+
+      <div id="settings-alert"></div>
+
+      <!-- Settings Layout Grid -->
+      <div class="grid cols-2">
+
+        <!-- Profile Settings Card -->
+        <div class="card">
+          <h2>👤 Profile Information</h2>
+          <form id="profile-form">
+            <div class="form-group">
+              <label for="set-name">Full Name</label>
+              <input id="set-name" type="text" required placeholder="Your full name" data-testid="settings-name" />
+            </div>
+            <div class="form-group">
+              <label for="set-email">Email Address</label>
+              <input id="set-email" type="email" required placeholder="you@example.com" data-testid="settings-email" />
+            </div>
+            <div class="form-group">
+              <label for="set-phone">Phone Number (Optional)</label>
+              <input id="set-phone" type="tel" placeholder="+91 98765 43210" data-testid="settings-phone" />
+            </div>
+            <button class="btn btn-primary" type="submit" data-testid="save-profile-btn">Save Profile Changes</button>
+          </form>
+        </div>
+
+        <!-- Financial Preferences Card -->
+        <div class="card">
+          <h2>💰 Financial Preferences</h2>
+          <form id="preferences-form">
+            <div class="form-group">
+              <label for="set-currency">Default Currency</label>
+              <select id="set-currency" data-testid="settings-currency">
+                <option value="INR">INR (₹) - Indian Rupee</option>
+                <option value="USD">USD ($) - US Dollar</option>
+                <option value="EUR">EUR (€) - Euro</option>
+                <option value="GBP">GBP (£) - British Pound</option>
+                <option value="AED">AED (د.إ) - UAE Dirham</option>
+                <option value="SGD">SGD (S$) - Singapore Dollar</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="set-inc-target">Monthly Income Target</label>
+                <input id="set-inc-target" type="number" min="0" step="500" placeholder="62000"
+                  data-testid="settings-inc-target" />
+              </div>
+              <div class="form-group">
+                <label for="set-sav-target">Monthly Savings Target</label>
+                <input id="set-sav-target" type="number" min="0" step="500" placeholder="20000"
+                  data-testid="settings-sav-target" />
+              </div>
+            </div>
+            <button class="btn btn-ghost" type="submit" data-testid="save-pref-btn">Update Preferences</button>
+          </form>
+        </div>
+
+        <!-- Security & Password Card -->
+        <div class="card">
+          <h2>🛡️ Security & Authentication</h2>
+          <form id="password-form">
+            <div class="form-group">
+              <label for="set-curr-pass">Current Password</label>
+              <input id="set-curr-pass" type="password" required placeholder="••••••••" data-testid="curr-password" />
+            </div>
+            <div class="form-group">
+              <label for="set-new-pass">New Password (min 6 chars)</label>
+              <input id="set-new-pass" type="password" required minlength="6" placeholder="••••••••"
+                data-testid="new-password" />
+            </div>
+            <button class="btn btn-primary" type="submit" data-testid="change-pass-btn">Change Password</button>
+          </form>
+        </div>
+
+        <!-- Privacy & Data (GDPR) Card -->
+        <div class="card">
+          <h2>🔒 Data Privacy & GDPR Controls</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            You retain 100% ownership of your financial entries. Download your dataset anytime or permanently delete
+            your account.
+          </p>
+          <div class="flex gap-12 flex-wrap mb-16">
+            <button class="btn btn-ghost" onclick="exportUserData()">📥 Export All Data (JSON)</button>
+            <button class="btn btn-ghost" onclick="generateFinancialReportPDF()">📄 Download PDF Report</button>
+          </div>
+          <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+            <div class="flex between align-center">
+              <div>
+                <strong style="color: var(--danger); font-size: 14px;">Delete Account</strong>
+                <div style="font-size: 12px; color: var(--text-muted);">Permanently purge account & all financial
+                  records</div>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="deleteUserAccount()">Delete Account</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/robotoFont.js"></script>
+  <script src="/js/pdfReport.js"></script>
+  <script src="/js/cookieConsent.js"></script>
+  <script>
+    Auth.requireLogin();
+    renderSidebar('settings');
+
+    const alertEl = document.getElementById('settings-alert');
+
+    function showAlert(msg, type = 'success') {
+      alertEl.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+      setTimeout(() => { alertEl.innerHTML = ''; }, 4000);
+    }
+
+    async function loadSettings() {
+      try {
+        const { user } = await api('/api/auth/me');
+        if (user) {
+          Auth.set(Auth.token, user);
+          document.getElementById('set-name').value = user.name || '';
+          document.getElementById('set-email').value = user.email || '';
+          document.getElementById('set-phone').value = user.phone || '';
+          document.getElementById('set-currency').value = user.currency || 'INR';
+          document.getElementById('set-inc-target').value = user.monthly_income_target || 62000;
+          document.getElementById('set-sav-target').value = user.monthly_savings_target || 20000;
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    }
+
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const res = await api('/api/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: document.getElementById('set-name').value.trim(),
+            email: document.getElementById('set-email').value.trim(),
+            phone: document.getElementById('set-phone').value.trim(),
+            currency: document.getElementById('set-currency').value,
+            monthly_income_target: document.getElementById('set-inc-target').value,
+            monthly_savings_target: document.getElementById('set-sav-target').value,
+          }),
+        });
+        Auth.set(Auth.token, res.user);
+        showAlert('Profile updated successfully!');
+        renderSidebar('settings');
+      } catch (err) {
+        showAlert(err.message, 'error');
+      }
+    });
+
+    document.getElementById('preferences-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const res = await api('/api/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: document.getElementById('set-name').value.trim(),
+            email: document.getElementById('set-email').value.trim(),
+            phone: document.getElementById('set-phone').value.trim(),
+            currency: document.getElementById('set-currency').value,
+            monthly_income_target: document.getElementById('set-inc-target').value,
+            monthly_savings_target: document.getElementById('set-sav-target').value,
+          }),
+        });
+        Auth.set(Auth.token, res.user);
+        showAlert('Financial preferences saved!');
+        renderSidebar('settings');
+      } catch (err) {
+        showAlert(err.message, 'error');
+      }
+    });
+
+    document.getElementById('password-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentPassword = document.getElementById('set-curr-pass').value;
+      const newPassword = document.getElementById('set-new-pass').value;
+      try {
+        await api('/api/auth/change-password', {
+          method: 'PUT',
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        e.target.reset();
+        showAlert('Password changed successfully!');
+      } catch (err) {
+        showAlert(err.message, 'error');
+      }
+    });
+
+    loadSettings();
+  </script>
+</body>
+
+</html>
