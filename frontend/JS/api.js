@@ -26,6 +26,12 @@ const Auth = {
     if (!this.token) {
       window.location.href = '/login.html';
     }
+  },
+  requireAdmin() {
+    this.requireLogin();
+    if (this.user && this.user.role !== 'admin') {
+      window.location.href = '/dashboard.html';
+    }
   }
 };
 
