@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wealth Analytics · Finora Financial Habit Builder</title>
-  <meta name="description" content="Analyze net worth velocity, monthly savings rate %, and cash flow trends on Finora." />
+  <meta name="description"
+    content="Analyze net worth velocity, monthly savings rate %, and cash flow trends on Finora." />
   <link rel="canonical" href="https://wealthpulse.app/analytics.html" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
@@ -23,13 +25,16 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="/css/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- jsPDF & autoTable for Report PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
+
 <body>
   <div class="app-shell">
     <aside id="app-sidebar" class="sidebar"></aside>
@@ -46,7 +51,9 @@
       </div>
 
       <!-- Financial Health Cards -->
-      <div class="grid cols-4" id="stat-cards"><div class="spinner"></div></div>
+      <div class="grid cols-4" id="stat-cards">
+        <div class="spinner"></div>
+      </div>
 
       <!-- Charts Row 1: Net Worth & Cash Flow -->
       <div class="grid cols-2 mt-24">
@@ -54,7 +61,8 @@
           <div class="flex between mb-16">
             <div>
               <h2>Net Worth Trajectory</h2>
-              <div style="font-size: 12px; color: var(--text-muted);">Cumulative Liquid Savings + Investment Portfolio</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Cumulative Liquid Savings + Investment Portfolio
+              </div>
             </div>
             <span class="badge green">Compounding</span>
           </div>
@@ -79,7 +87,8 @@
           <div class="flex between mb-16">
             <div>
               <h2>Expense Category Distribution</h2>
-              <div style="font-size: 12px; color: var(--text-muted);">Allocation across living essentials & discretionary</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Allocation across living essentials &
+                discretionary</div>
             </div>
             <span class="badge amber">Breakdown</span>
           </div>
@@ -90,7 +99,8 @@
           <div class="flex between mb-16">
             <div>
               <h2>Monthly Savings Rate (%)</h2>
-              <div style="font-size: 12px; color: var(--text-muted);">Percentage of total income retained (Target: > 20%)</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Percentage of total income retained (Target: >
+                20%)</div>
             </div>
             <span class="badge purple">Discipline Metric</span>
           </div>
@@ -102,6 +112,7 @@
 
   <script src="/js/api.js"></script>
   <script src="/js/layout.js"></script>
+  <script src="/js/robotoFont.js"></script>
   <script src="/js/pdfReport.js"></script>
   <script src="/js/cookieConsent.js"></script>
   <script>
@@ -238,4 +249,5 @@
     });
   </script>
 </body>
+
 </html>
