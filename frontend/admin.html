@@ -146,11 +146,11 @@
   <script src="/js/pdfReport.js"></script>
   <script src="/js/cookieConsent.js"></script>
   <script>
-    Auth.requireAdmin();
-    renderSidebar('admin');
-
     let allUsers = [];
     let allFeedback = [];
+
+    Auth.requireAdmin();
+    renderSidebar('admin');
 
     async function loadStats() {
       try {
@@ -184,7 +184,7 @@
 
     function renderUsers(users) {
       const el = document.getElementById('users-list');
-      if (!users.length) {
+      if (!users || !users.length) {
         el.innerHTML = `<div class="empty">No users found matching filter criteria.</div>`;
         return;
       }
@@ -213,12 +213,12 @@
                     <div class="user-cell">
                       <div class="avatar-circle">${initials}</div>
                       <div>
-                        <strong>${u.name}</strong> ${isSelf ? '<span class="badge blue" style="font-size:10px;">You</span>' : ''}
-                        <div class="text-muted" style="font-size:12px;">${u.email}</div>
+                        <strong>${u.name || 'User'}</strong> ${isSelf ? '<span class="badge blue" style="font-size:10px;">You</span>' : ''}
+                        <div class="text-muted" style="font-size:12px;">${u.email || ''}</div>
                       </div>
                     </div>
                   </td>
-                  <td><span class="badge ${isAdmin ? 'amber' : 'blue'}">${u.role.toUpperCase()}</span></td>
+                  <td><span class="badge ${isAdmin ? 'amber' : 'blue'}">${(u.role || 'user').toUpperCase()}</span></td>
                   <td><span class="badge">${u.currency || 'INR'}</span></td>
                   <td>${fmtDate(u.created_at)}</td>
                   <td class="num">${u.habit_count || 0}</td>
@@ -241,10 +241,10 @@
     }
 
     function filterUsers() {
-      const q = document.getElementById('user-search').value.toLowerCase();
+      const q = (document.getElementById('user-search').value || '').toLowerCase();
       const role = document.getElementById('user-role-filter').value;
-      const filtered = allUsers.filter(u => {
-        const matchesQuery = u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      const filtered = (allUsers || []).filter(u => {
+        const matchesQuery = (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
         const matchesRole = role === 'all' || u.role === role;
         return matchesQuery && matchesRole;
       });
@@ -324,7 +324,7 @@
 
     function filterFeedback() {
       const status = document.getElementById('feedback-status-filter').value;
-      const filtered = allFeedback.filter(f => status === 'all' || f.status === status);
+      const filtered = (allFeedback || []).filter(f => status === 'all' || f.status === status);
       renderFeedback(filtered);
     }
 
